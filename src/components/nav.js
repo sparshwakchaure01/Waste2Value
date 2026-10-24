@@ -30,6 +30,11 @@ export async function refreshNavBadge(force = false) {
   paintBadge();
 }
 
+if (typeof document !== 'undefined' && !window.__w2vMenuClose) {
+  window.__w2vMenuClose = true;
+  document.addEventListener('click', () => document.querySelectorAll('.user-menu.open').forEach(m => m.classList.remove('open')));
+}
+
 export function closeNav() {
   document.body.classList.remove('nav-open');
 }
@@ -51,11 +56,12 @@ export function renderNav() {
   } else if (role === 'logistics') {
     links.push(
       { path: 'dashboard', label: 'Dashboard' },
-      { path: 'logistics', label: 'Service Area & Deals' },
+      { path: 'logistics', label: 'Transport Jobs' },
     );
   }
   if (isAdmin) links.push({ path: 'admin', label: 'Admin' });
 
+  const profileActive = currentHash === 'profile';
   const linkEl = (l) => el('a', {
     class: `nav-link ${(l.match || [l.path]).includes(currentHash) ? 'active' : ''}`,
     onclick: () => { closeNav(); navigate(l.path); }
@@ -68,6 +74,18 @@ export function renderNav() {
     onclick: () => document.body.classList.toggle('nav-open')
   }, [el('span'), el('span'), el('span')]);
 
+  const goProfile = () => { closeNav(); menu.classList.remove('open'); navigate('profile'); };
+  const menu = el('div', { class: 'user-menu' }, [
+    el('div', { class: 'user-menu-head' }, [el('strong', {}, name || 'Signed in'), el('span', {}, state.firebaseUser?.email || '')]),
+    el('button', { class: 'user-menu-item', onclick: goProfile }, 'My Profile'),
+    el('button', { class: 'user-menu-item', onclick: signOutUser }, 'Sign out')
+  ]);
+  const avatarBtn = el('button', {
+    class: `nav-avatar nav-avatar-btn ${profileActive ? 'active' : ''}`, 'aria-label': 'Account menu', title: 'Account',
+    onclick: (e) => { e.stopPropagation(); menu.classList.toggle('open'); }
+  }, avatarText);
+  const userMenu = el('div', { class: 'user-menu-wrap' }, [avatarBtn, menu]);
+
   const nav = el('nav', { class: 'topnav' }, [
     el('div', { class: 'topnav-inner' }, [
       el('div', {
@@ -77,14 +95,14 @@ export function renderNav() {
       el('div', { class: 'nav-links' }, links.map(linkEl)),
       el('div', { class: 'nav-user' }, [
         role ? el('span', { class: 'nav-role-badge' }, role) : null,
-        el('div', { class: 'nav-avatar' }, avatarText),
-        el('button', { class: 'btn btn-ghost-light btn-sm', onclick: signOutUser }, 'Sign out'),
+        userMenu,
         toggle
       ])
     ]),
     // Mobile drawer
     el('div', { class: 'nav-drawer' }, [
       ...links.map(linkEl),
+      el('a', { class: `nav-link ${profileActive ? 'active' : ''}`, onclick: goProfile }, 'My Profile'),
       el('div', { class: 'nav-drawer-user' }, [
         el('div', { class: 'nav-avatar' }, avatarText),
         el('div', {}, [el('div', { style: 'color:#fff;font-weight:700;' }, name || 'Signed in'), role ? el('div', {}, role) : null])

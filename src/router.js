@@ -13,6 +13,7 @@ import { renderLogistics } from './pages/logistics.js';
 import { renderAdmin } from './pages/admin.js';
 import { renderAdminLogin } from './pages/adminLogin.js';
 import { renderMyListings } from './pages/myListings.js';
+import { renderProfile } from './pages/profile.js';
 import { renderNav } from './components/nav.js';
 
 const routes = [
@@ -26,6 +27,7 @@ const routes = [
   { path: 'edit-listing/:id', auth: true, requiresRole: true, roles: ['industry'], render: renderEditListing },
   { path: 'matches', auth: true, requiresRole: true, roles: ['industry'], render: renderMatches },
   { path: 'logistics', auth: true, requiresRole: true, roles: ['logistics'], render: renderLogistics },
+  { path: 'profile', auth: true, render: renderProfile },
   { path: 'admin-login', auth: false, render: renderAdminLogin },
   { path: 'admin', auth: false, adminOnly: true, render: renderAdmin },
 ];
