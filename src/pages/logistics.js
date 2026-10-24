@@ -1,216 +1,148 @@
-import { el, toast, timeAgo, skeletonRows } from '../utils.js';
-import { state, setState } from '../state.js';
-import { saveLogisticsProfile } from '../services/logistics.js';
-import { getAcceptedDealsForDistricts } from '../services/requests.js';
-import { getIncomingTransports, updateTransportStatus, completePickup, transportRevealLevel } from '../services/transports.js';
+import { el, toast, timeAgo, skeletonRows, confirmDialog } from '../utils.js';
+import { state } from '../state.js';
+import { navigate } from '../router.js';
+import {
+  getIncomingTransports, acceptTransport, declineTransport, markInTransit, markDelivered,
+  transportRevealLevel, TRANSPORT_LABEL
+} from '../services/transports.js';
 import { fetchUserDoc } from '../auth.js';
-import { MAHARASHTRA_DISTRICTS } from '../data/districts.js';
 import { renderRevealCard } from '../components/blindReveal.js';
 import { emptyState } from '../components/emptyState.js';
+import { routeLine, transportStepper } from '../components/route.js';
 
-const VEHICLE_TYPES = ['Mini Truck (Tata Ace / similar)', 'Pickup', 'Truck (6-10 tonne)', 'Trailer (10+ tonne)', 'Tempo / Van'];
+const pillFor = s => (s === 'pending' ? 'reserved' : s === 'declined' ? 'declined' : s === 'completed' ? 'neutral' : 'matched');
 
+// A logistics partner only ever sees transport requests addressed to them by the buyer or
+// seller of an accepted deal — never the marketplace, never other partners' jobs.
 export async function renderLogistics(container) {
+  const me = state.userDoc;
+  const covers = me.servesAll ? 'any district' : `${(me.districts || []).length} district${(me.districts || []).length === 1 ? '' : 's'}`;
+
   container.appendChild(el('div', { class: 'page-header' }, [
-    el('div', {}, [el('h1', {}, 'Service Area & Deals'), el('p', {}, 'Pick the districts you operate in. Buyers and sellers of accepted deals there can request your transport.')])
+    el('div', {}, [el('h1', {}, 'Transport Jobs'), el('p', {}, 'Requests sent to you by buyers and sellers of confirmed deals.')]),
+    el('button', { class: 'btn btn-outline', onclick: () => navigate('profile') }, `Service area: ${covers}`)
   ]));
 
-  const profile = state.userDoc;
-  const selected = new Set(profile.districts || []);
+  if (!me.servesAll && !(me.districts || []).length) {
+    container.appendChild(el('div', { class: 'card' }, [
+      el('h3', {}, 'Set your service area first'),
+      el('p', {}, 'Buyers and sellers can only find you once you add the districts you cover (or tick “any district”).'),
+      el('button', { class: 'btn btn-primary', onclick: () => navigate('profile') }, 'Open My Profile')
+    ]));
+  }
 
-  // ---- district picker with search / select all / clear ----
-  const grid = el('div', { class: 'district-grid' });
-  const chips = new Map();
-  MAHARASHTRA_DISTRICTS.forEach(d => {
-    const chip = el('div', { class: `district-chip ${selected.has(d) ? 'selected' : ''}` }, d);
-    chip.addEventListener('click', () => {
-      if (selected.has(d)) { selected.delete(d); chip.classList.remove('selected'); }
-      else { selected.add(d); chip.classList.add('selected'); }
-      updateCount();
-    });
-    chips.set(d, chip);
-    grid.appendChild(chip);
-  });
-
-  const countEl = el('span', { class: 'text-faint' });
-  const updateCount = () => { countEl.textContent = `${selected.size} of ${MAHARASHTRA_DISTRICTS.length} selected`; };
-  updateCount();
-
-  const visibleDistricts = () => MAHARASHTRA_DISTRICTS.filter(d => chips.get(d).style.display !== 'none');
-  const searchInput = el('input', { type: 'search', class: 'input', placeholder: 'Search districts…' });
-  searchInput.addEventListener('input', () => {
-    const q = searchInput.value.trim().toLowerCase();
-    chips.forEach((chip, d) => { chip.style.display = d.toLowerCase().includes(q) ? '' : 'none'; });
-  });
-  const setAll = (on) => {
-    visibleDistricts().forEach(d => {
-      if (on) selected.add(d); else selected.delete(d);
-      chips.get(d).classList.toggle('selected', on);
-    });
-    updateCount();
-  };
-
-  const vehicleSelect = el('select', { id: 'f-vehicle' },
-    VEHICLE_TYPES.map(v => el('option', { value: v, selected: v === profile.vehicleType ? true : false }, v)));
-  const phoneInput = el('input', { type: 'tel', id: 'f-phone', value: profile.phone || '', placeholder: '10-digit mobile number' });
-  const companyInput = el('input', { type: 'text', id: 'f-company', value: profile.companyName || '', placeholder: 'Transport company / owner name' });
-  const saveBtn = el('button', { class: 'btn btn-primary' }, 'Save Service Area');
-
-  container.appendChild(el('div', { class: 'card' }, [
-    el('h3', {}, 'Vehicle details'),
-    el('div', { class: 'field-row mt-16' }, [
-      el('div', { class: 'field' }, [el('label', {}, 'Company / Owner name'), companyInput]),
-      el('div', { class: 'field' }, [el('label', {}, 'Phone'), phoneInput]),
-    ]),
-    el('div', { class: 'field' }, [el('label', {}, 'Vehicle type'), vehicleSelect]),
-    el('h3', { class: 'mt-16' }, 'Districts you operate in'),
-    el('p', { class: 'text-faint' }, 'Select every district you can serve — flexible point A to point B within each.'),
-    el('div', { class: 'district-tools' }, [
-      searchInput,
-      el('button', { type: 'button', class: 'btn btn-outline btn-sm', onclick: () => setAll(true) }, 'Select all'),
-      el('button', { type: 'button', class: 'btn btn-outline btn-sm', onclick: () => setAll(false) }, 'Clear'),
-      countEl
-    ]),
-    grid,
-    el('div', { class: 'mt-16' }, saveBtn)
-  ]));
-
-  saveBtn.addEventListener('click', async () => {
-    const companyName = companyInput.value.trim();
-    const phone = phoneInput.value.trim();
-    if (!companyName || !phone) { toast('Please fill in company name and phone.', 'error'); return; }
-    if (!selected.size) { toast('Select at least one district.', 'error'); return; }
-    saveBtn.disabled = true; saveBtn.textContent = 'Saving…';
-    try {
-      await saveLogisticsProfile(state.firebaseUser.uid, {
-        vehicleType: vehicleSelect.value,
-        districts: Array.from(selected),
-        phone, companyName
-      });
-      const userDoc = await fetchUserDoc(state.firebaseUser.uid);
-      setState({ userDoc });
-      toast('Service area saved.', 'success');
-      drawDeals();
-    } catch (err) {
-      console.error(err);
-      toast(`Could not save${err.code ? ` (${err.code})` : ''}. ${err.code === 'permission-denied' ? 'Publish the latest Firestore rules.' : 'Try again.'}`, 'error');
-    } finally {
-      saveBtn.disabled = false; saveBtn.textContent = 'Save Service Area';
-    }
-  });
-
-  // ---- deals / transport requests ----
-  const sections = el('div', {});
-  container.appendChild(sections);
+  const body = el('div', {});
+  container.appendChild(body);
 
   function heading(text, note) {
     return el('div', { class: 'section-head' }, [el('h3', {}, text), note ? el('span', { class: 'text-faint' }, note) : null]);
   }
 
-  async function transportCard(t, actions) {
-    const level = transportRevealLevel(t.status);
-    const requester = level !== 'none' ? await fetchUserDoc(t.requesterId) : null;
+  async function jobCard(t) {
+    const unlocked = transportRevealLevel(t.status) !== 'none';
+    const requestedBy = t.requesterId === t.sellerId ? 'seller' : 'buyer';
+    const meta = el('div', { class: 'meta-chips' }, [
+      el('span', { class: 'pill pill-neutral' }, `Requested by ${requestedBy}`),
+      t.pickupDate ? el('span', { class: 'pill pill-reserved' }, `Pickup by ${t.pickupDate}`) : null
+    ]);
+
     const card = el('div', { class: 'request-card' }, [
       el('div', { class: 'flex-between' }, [
         el('div', {}, [
           el('strong', {}, `${t.category} · ${t.quantity} ${t.unit}`),
-          el('div', { class: 'text-faint' }, `${t.district} · ${timeAgo(t.updatedAt || t.createdAt)}`)
+          el('div', { class: 'text-faint' }, timeAgo(t.createdAt))
         ]),
-        el('span', { class: `pill pill-${t.status === 'pending' ? 'reserved' : t.status === 'declined' ? 'declined' : 'matched'}` }, t.status === 'completed' ? 'picked up' : t.status)
+        el('span', { class: `pill pill-${pillFor(t.status)}` }, TRANSPORT_LABEL[t.status] || t.status)
       ]),
-      renderRevealCard(level, requester, 'Requester')
+      routeLine(t.fromDistrict, t.toDistrict),
+      meta,
+      t.note ? el('p', { class: 'mt-16', style: 'font-style:italic;' }, `“${t.note}”`) : null
     ]);
-    if (actions) card.appendChild(el('div', { class: 'flex gap-12 mt-16' }, actions));
+
+    if (t.status !== 'declined') card.appendChild(transportStepper(t.status));
+
+    if (!unlocked) {
+      card.appendChild(renderRevealCard('none', null, 'Seller & buyer'));
+    } else {
+      const [seller, buyer] = await Promise.all([fetchUserDoc(t.sellerId), fetchUserDoc(t.buyerId)]);
+      card.appendChild(el('div', { class: 'two-col' }, [
+        el('div', {}, [el('div', { class: 'reveal-title' }, 'Pickup — seller'), renderRevealCard('full', seller, 'Seller')]),
+        el('div', {}, [el('div', { class: 'reveal-title' }, 'Drop — buyer'), renderRevealCard('full', buyer, 'Buyer')])
+      ]));
+    }
+
+    const actions = [];
+    const run = (btns, fn, msg) => async () => {
+      btns.forEach(b => { b.disabled = true; });
+      try {
+        await fn();
+        toast(msg, 'success');
+        draw();
+      } catch (err) {
+        console.error(err);
+        const taken = err.code === 'permission-denied';
+        toast(taken ? 'Not allowed — this deal may already have a partner, or the latest rules aren’t published.' : `Could not update${err.code ? ` (${err.code})` : ''}.`, 'error');
+        btns.forEach(b => { b.disabled = false; });
+      }
+    };
+
+    if (t.status === 'pending') {
+      const decline = el('button', { class: 'btn btn-outline btn-sm' }, 'Decline');
+      const accept = el('button', { class: 'btn btn-primary btn-sm' }, 'Accept job');
+      decline.addEventListener('click', async () => {
+        if (!(await confirmDialog({ title: 'Decline this job?', text: 'The requester will see that you declined and can pick another partner.', confirmLabel: 'Decline', danger: true }))) return;
+        run([decline, accept], () => declineTransport(t.id), 'Request declined.')();
+      });
+      accept.addEventListener('click', run([decline, accept], () => acceptTransport(t), 'Job accepted — contacts unlocked.'));
+      actions.push(decline, accept);
+    } else if (t.status === 'accepted') {
+      const btn = el('button', { class: 'btn btn-primary btn-sm' }, 'Mark picked up');
+      btn.addEventListener('click', run([btn], () => markInTransit(t.id), 'Marked as picked up — in transit.'));
+      actions.push(btn);
+    } else if (t.status === 'in_transit') {
+      const btn = el('button', { class: 'btn btn-primary btn-sm' }, 'Mark delivered');
+      btn.addEventListener('click', run([btn], () => markDelivered(t), 'Delivered — deal completed.'));
+      actions.push(btn);
+    }
+    if (actions.length) card.appendChild(el('div', { class: 'flex gap-12 mt-16 wrap' }, actions));
     return card;
   }
 
-  async function drawDeals() {
-    sections.replaceChildren(skeletonRows(2));
-    let transports, openDeals;
+  async function draw() {
+    body.replaceChildren(skeletonRows(2));
+    let jobs;
     try {
-      const districts = Array.from(selected);
-      [transports, openDeals] = await Promise.all([
-        getIncomingTransports(state.firebaseUser.uid),
-        getAcceptedDealsForDistricts(districts)
-      ]);
+      jobs = await getIncomingTransports(state.firebaseUser.uid);
     } catch (err) {
       console.error(err);
-      sections.replaceChildren(emptyState('deals', 'Could not load deals — check your connection and Firestore rules.'));
+      body.replaceChildren(emptyState('deals', 'Could not load your jobs — check your connection and Firestore rules.'));
       return;
     }
 
-    const pending = transports.filter(t => t.status === 'pending');
-    const accepted = transports.filter(t => t.status === 'accepted');
-    const done = transports.filter(t => t.status === 'completed');
-    const handled = new Set(transports.map(t => t.requestId));
-    const unassigned = openDeals.filter(d => !handled.has(d.id));
+    const pending = jobs.filter(t => t.status === 'pending');
+    const active = jobs.filter(t => t.status === 'accepted' || t.status === 'in_transit');
+    const done = jobs.filter(t => t.status === 'completed');
+    const declined = jobs.filter(t => t.status === 'declined');
 
     const out = [];
+    out.push(heading('New requests', `${pending.length} waiting`));
+    if (!pending.length) out.push(emptyState('partners', 'No new requests. When a buyer or seller picks you for a deal, it shows up here.'));
+    for (const t of pending) out.push(await jobCard(t));
 
-    out.push(heading('Transport requests', `${pending.length} waiting`));
-    if (!pending.length) out.push(emptyState('partners', 'No new transport requests.'));
-    for (const t of pending) {
-      const decline = el('button', { class: 'btn btn-outline btn-sm' }, 'Decline');
-      const accept = el('button', { class: 'btn btn-primary btn-sm' }, 'Accept');
-      const run = async (status, msg) => {
-        decline.disabled = accept.disabled = true;
-        try {
-          await updateTransportStatus(t.id, status);
-          toast(msg, 'success');
-          drawDeals();
-        } catch (err) {
-          console.error(err);
-          toast(`Could not update${err.code ? ` (${err.code})` : ''}.`, 'error');
-          decline.disabled = accept.disabled = false;
-        }
-      };
-      decline.addEventListener('click', () => run('declined', 'Request declined.'));
-      accept.addEventListener('click', () => run('accepted', 'Accepted — requester details unlocked.'));
-      out.push(await transportCard(t, [decline, accept]));
-    }
-
-    out.push(heading('My pickups', `${accepted.length} to collect`));
-    if (!accepted.length) out.push(emptyState('deals', 'Accepted transport jobs appear here.'));
-    for (const t of accepted) {
-      const btn = el('button', { class: 'btn btn-primary btn-sm' }, 'Mark picked up');
-      btn.addEventListener('click', async () => {
-        btn.disabled = true; btn.textContent = 'Saving…';
-        try {
-          await completePickup(t);
-          toast('Marked as picked up.', 'success');
-          drawDeals();
-        } catch (err) {
-          console.error(err);
-          toast(`Could not mark as picked up${err.code ? ` (${err.code})` : ''}.`, 'error');
-          btn.disabled = false; btn.textContent = 'Mark picked up';
-        }
-      });
-      out.push(await transportCard(t, [btn]));
-    }
-
-    out.push(heading('Deals ready for pickup in your districts', 'Buyers/sellers can request you from their Matches page'));
-    if (!unassigned.length) out.push(emptyState('deals', selected.size ? 'No other accepted deals in your districts right now.' : 'Save your districts to see accepted deals nearby.'));
-    unassigned.forEach(d => out.push(el('div', { class: 'request-card' }, [
-      el('div', { class: 'flex-between' }, [
-        el('strong', {}, `${d.category} · ${d.quantity} ${d.unit}`),
-        el('span', { class: 'pill pill-matched' }, d.status)
-      ]),
-      el('div', { class: 'text-faint' }, `${d.district} · accepted ${timeAgo(d.updatedAt || d.createdAt)}`)
-    ])));
+    out.push(heading('Active jobs', `${active.length}`));
+    if (!active.length) out.push(emptyState('deals', 'Accepted jobs appear here with both parties’ contact details.'));
+    for (const t of active) out.push(await jobCard(t));
 
     if (done.length) {
-      out.push(heading('Completed pickups', `${done.length}`));
-      done.forEach(t => out.push(el('div', { class: 'request-card' }, [
-        el('div', { class: 'flex-between' }, [
-          el('strong', {}, `${t.category} · ${t.quantity} ${t.unit}`),
-          el('span', { class: 'pill pill-neutral' }, 'picked up')
-        ]),
-        el('div', { class: 'text-faint' }, `${t.district} · ${timeAgo(t.updatedAt || t.createdAt)}`)
-      ])));
+      out.push(heading('Delivered', `${done.length}`));
+      for (const t of done) out.push(await jobCard(t));
     }
-
-    sections.replaceChildren(...out);
+    if (declined.length) {
+      out.push(heading('Declined', `${declined.length}`));
+      for (const t of declined) out.push(await jobCard(t));
+    }
+    body.replaceChildren(...out);
   }
 
-  await drawDeals();
+  await draw();
 }

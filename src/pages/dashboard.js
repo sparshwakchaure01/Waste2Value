@@ -2,7 +2,7 @@ import { el, timeAgo, counter, skeletonStats } from '../utils.js';
 import { state } from '../state.js';
 import { navigate } from '../router.js';
 import { getUserListings, totalKg } from '../services/listings.js';
-import { getIncomingRequests, getOutgoingRequests, getAcceptedDealsForDistricts } from '../services/requests.js';
+import { getIncomingRequests, getOutgoingRequests } from '../services/requests.js';
 import { getIncomingTransports } from '../services/transports.js';
 import { barChart } from '../components/charts.js';
 import { emptyState } from '../components/emptyState.js';
@@ -107,31 +107,32 @@ async function renderIndustryDashboard(container) {
 }
 
 async function renderLogisticsDashboardHome(container) {
-  const districts = state.userDoc.districts || [];
+  const me = state.userDoc;
+  const districts = me.districts || [];
+  const configured = me.servesAll === true || districts.length > 0;
   const skeleton = skeletonStats(4);
   container.appendChild(skeleton);
-  const [deals, transports] = await Promise.all([
-    getAcceptedDealsForDistricts(districts), getIncomingTransports(state.firebaseUser.uid)
-  ]);
+  const jobs = await getIncomingTransports(state.firebaseUser.uid);
   skeleton.remove();
 
   container.appendChild(el('div', { class: 'stat-row' }, [
-    statCard(districts.length, 'Districts Covered'),
-    statCard(deals.length, 'Deals Ready for Pickup'),
-    statCard(transports.filter(t => t.status === 'pending').length, 'Transport Requests'),
-    statCard(transports.filter(t => t.status === 'accepted').length, 'Pickups To Collect'),
+    statCard(me.servesAll ? 36 : districts.length, me.servesAll ? 'Districts (any)' : 'Districts Covered'),
+    statCard(jobs.filter(t => t.status === 'pending').length, 'New Requests'),
+    statCard(jobs.filter(t => t.status === 'accepted' || t.status === 'in_transit').length, 'Active Jobs'),
+    statCard(jobs.filter(t => t.status === 'completed').length, 'Delivered'),
   ]));
 
-  if (!districts.length) {
+  if (!configured) {
     container.appendChild(el('div', { class: 'card' }, [
-      el('p', {}, 'You haven’t set your service districts yet.'),
-      el('button', { class: 'btn btn-primary', onclick: () => navigate('logistics') }, 'Set Up Service Area')
-    ]));
-  } else {
-    container.appendChild(el('div', { class: 'qa-grid' }, [
-      quickAction('truck', 'Service Area & Deals', 'logistics', true),
+      el('h3', {}, 'Set your service area'),
+      el('p', {}, 'Add the districts you cover so buyers and sellers can find and request you.'),
+      el('button', { class: 'btn btn-primary', onclick: () => navigate('profile') }, 'Open My Profile')
     ]));
   }
+  container.appendChild(el('div', { class: 'qa-grid' }, [
+    quickAction('truck', 'Transport Jobs', 'logistics', true),
+    quickAction('boxes', 'My Profile', 'profile'),
+  ]));
 }
 
 function statCard(n, label) {

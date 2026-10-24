@@ -58,6 +58,7 @@ export function renderRevealCard(level, otherUser, otherLabel = 'Other party') {
     contactRow('Company', otherUser?.companyName || otherUser?.name || '—'),
     contactRow('Phone', phone, { href: phone ? `tel:${phone}` : null, copy: true }),
     contactRow('Email', otherUser?.email, { href: otherUser?.email ? `mailto:${otherUser.email}` : null, copy: true }),
-    contactRow('District', otherUser?.district || '—')
+    contactRow('District', otherUser?.district || '—'),
+    otherUser?.address ? contactRow('Address', otherUser.address) : null
   ]);
 }
