@@ -19,10 +19,9 @@ export function el(tag, attrs = {}, children = []) {
 const MAX_PHOTO_BYTES = 1024 * 1024; // 1MB hard limit, as specified
 
 // Base64 inflates size by ~33% and a Firestore document is capped at 1MiB, so after the
-// 1MB upload check the image is downscaled to a JPEG (max 1200px) before being stored.
-const MAX_PHOTO_DIMENSION = 1200;
+// 1MB upload check the image is downscaled to a JPEG (default max 1200px) before being stored.
 
-export function fileToBase64(file) {
+export function fileToBase64(file, { maxDim = 1200, quality = 0.8 } = {}) {
   return new Promise((resolve, reject) => {
     if (!file) return resolve(null);
     if (!file.type.startsWith('image/')) {
@@ -39,7 +38,7 @@ export function fileToBase64(file) {
       const img = new Image();
       img.onerror = () => reject(new Error('Could not read that image.'));
       img.onload = () => {
-        const scale = Math.min(1, MAX_PHOTO_DIMENSION / Math.max(img.width, img.height));
+        const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
         const canvas = document.createElement('canvas');
         canvas.width = Math.round(img.width * scale);
         canvas.height = Math.round(img.height * scale);
@@ -47,7 +46,7 @@ export function fileToBase64(file) {
         ctx.fillStyle = '#fff';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        resolve(canvas.toDataURL('image/jpeg', 0.8)); // data:image/jpeg;base64,xxxx
+        resolve(canvas.toDataURL('image/jpeg', quality)); // data:image/jpeg;base64,xxxx
       };
       img.src = reader.result;
     };
@@ -147,4 +146,24 @@ export function skeletonStats(n = 3) {
   const wrap = el('div', { class: 'stat-row' });
   for (let i = 0; i < n; i++) wrap.appendChild(el('div', { class: 'stat-card' }, [sk('sk-num'), sk('sk-line sk-short')]));
   return wrap;
+}
+
+export const formatINR = n => '₹' + Math.round(Number(n) || 0).toLocaleString('en-IN');
+
+// Promise-based confirm modal (works as a bottom sheet on phones).
+export function confirmDialog({ title, text, confirmLabel = 'Confirm', danger = false }) {
+  return new Promise(resolve => {
+    const overlay = el('div', { class: 'modal-overlay' });
+    const done = (v) => { overlay.remove(); resolve(v); };
+    overlay.addEventListener('click', e => { if (e.target === overlay) done(false); });
+    overlay.appendChild(el('div', { class: 'modal' }, [
+      el('h3', {}, title),
+      el('p', {}, text),
+      el('div', { class: 'flex gap-12 mt-16' }, [
+        el('button', { class: 'btn btn-outline btn-block', onclick: () => done(false) }, 'Cancel'),
+        el('button', { class: `btn ${danger ? 'btn-rose' : 'btn-primary'} btn-block`, onclick: () => done(true) }, confirmLabel)
+      ])
+    ]));
+    document.body.appendChild(overlay);
+  });
 }

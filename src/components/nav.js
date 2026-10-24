@@ -30,7 +30,12 @@ export async function refreshNavBadge(force = false) {
   paintBadge();
 }
 
+export function closeNav() {
+  document.body.classList.remove('nav-open');
+}
+
 export function renderNav() {
+  closeNav();
   const currentHash = window.location.hash.replace(/^#\/?/, '').split('/')[0];
   const role = state.userDoc?.role;
   const isAdmin = isAdminEmail(state.firebaseUser?.email);
@@ -40,6 +45,7 @@ export function renderNav() {
     links.push(
       { path: 'dashboard', label: 'Dashboard' },
       { path: 'marketplace', label: 'Marketplace' },
+      { path: 'my-listings', label: 'My Listings', match: ['my-listings', 'edit-listing', 'create-listing'] },
       { path: 'matches', label: 'My Matches', badge: true },
     );
   } else if (role === 'logistics') {
@@ -50,24 +56,42 @@ export function renderNav() {
   }
   if (isAdmin) links.push({ path: 'admin', label: 'Admin' });
 
+  const linkEl = (l) => el('a', {
+    class: `nav-link ${(l.match || [l.path]).includes(currentHash) ? 'active' : ''}`,
+    onclick: () => { closeNav(); navigate(l.path); }
+  }, [l.label, l.badge ? el('span', { class: 'nav-badge', hidden: true }, '0') : null]);
+
+  const name = state.userDoc?.companyName || state.userDoc?.name || state.firebaseUser?.displayName || '';
+  const avatarText = initials(state.userDoc?.name || state.firebaseUser?.displayName || '?');
+  const toggle = el('button', {
+    class: 'nav-toggle', 'aria-label': 'Menu',
+    onclick: () => document.body.classList.toggle('nav-open')
+  }, [el('span'), el('span'), el('span')]);
+
   const nav = el('nav', { class: 'topnav' }, [
     el('div', { class: 'topnav-inner' }, [
       el('div', {
         class: 'brand',
-        onclick: () => navigate(role ? 'dashboard' : isAdmin ? 'admin' : '')
+        onclick: () => { closeNav(); navigate(role ? 'dashboard' : isAdmin ? 'admin' : ''); }
       }, brandLockup()),
-      el('div', { class: 'nav-links' },
-        links.map(l => el('a', {
-          class: `nav-link ${currentHash === l.path ? 'active' : ''}`,
-          onclick: () => navigate(l.path)
-        }, [l.label, l.badge ? el('span', { class: 'nav-badge', hidden: true }, '0') : null]))
-      ),
+      el('div', { class: 'nav-links' }, links.map(linkEl)),
       el('div', { class: 'nav-user' }, [
         role ? el('span', { class: 'nav-role-badge' }, role) : null,
-        el('div', { class: 'nav-avatar' }, initials(state.userDoc?.name || state.firebaseUser?.displayName || '?')),
-        el('button', { class: 'btn btn-ghost btn-sm', onclick: signOutUser }, 'Sign out')
+        el('div', { class: 'nav-avatar' }, avatarText),
+        el('button', { class: 'btn btn-ghost-light btn-sm', onclick: signOutUser }, 'Sign out'),
+        toggle
       ])
-    ])
+    ]),
+    // Mobile drawer
+    el('div', { class: 'nav-drawer' }, [
+      ...links.map(linkEl),
+      el('div', { class: 'nav-drawer-user' }, [
+        el('div', { class: 'nav-avatar' }, avatarText),
+        el('div', {}, [el('div', { style: 'color:#fff;font-weight:700;' }, name || 'Signed in'), role ? el('div', {}, role) : null])
+      ]),
+      el('button', { class: 'btn btn-outline btn-block', onclick: signOutUser }, 'Sign out')
+    ]),
+    el('div', { class: 'nav-scrim', onclick: closeNav })
   ]);
   queueMicrotask(() => { paintBadge(); refreshNavBadge(); });
   return nav;
