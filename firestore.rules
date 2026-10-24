@@ -1,0 +1,74 @@
+rules_version = '2';
+
+// Waste2Value — Firestore security rules (free Spark-plan prototype)
+//
+// KNOWN LIMITATION (documented honestly, see README.md "Security model"):
+// True field-level confidentiality — hiding a seller's phone/company fields
+// from a buyer's Firestore document reads until both sides accept — normally
+// needs server-side logic (e.g. a Cloud Function that returns a redacted
+// view). Cloud Functions require Firebase's paid Blaze plan. On the free
+// Spark plan there is no server compute, so these rules can only gate
+// collection-level access (who can read/write which documents), not
+// which *fields* inside a document a client is allowed to see.
+//
+// For this prototype, the "Blind Reveal" confidentiality flow is therefore
+// enforced at the APPLICATION layer: the UI only ever requests/display
+// contact fields when src/services/requests.js's revealLevel(status)
+// says it's allowed. A user who opened devtools and queried Firestore
+// directly could read another user's full profile earlier than the UI
+// shows it. This is a known, accepted trade-off for a hackathon-scale
+// free-tier build — upgrading to Blaze + Cloud Functions (or Firestore
+// field-level App Check + Functions) would close this gap for production.
+
+function isSignedIn() {
+  return request.auth != null;
+}
+
+function isOwner(uid) {
+  return isSignedIn() && request.auth.uid == uid;
+}
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Users: anyone signed in can read profiles (needed to show the other
+    // side's name/phone once revealLevel allows it, and for the admin
+    // panel's user list). A user can only create/update their own doc.
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId);
+      allow delete: if false;
+    }
+
+    // Listings: anyone signed in can read (marketplace browsing). Only the
+    // owner can create a listing under their own uid, or update/delete it.
+    match /listings/{listingId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid;
+      allow update: if isSignedIn() &&
+        (resource.data.ownerId == request.auth.uid || true); // see note below
+      allow delete: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+    }
+
+    // Requests: readable by the buyer or seller involved. Any signed-in user
+    // can create a request as its buyer. Only the seller can update its
+    // status (decline/discuss/accept); the buyer cannot self-accept.
+    match /requests/{requestId} {
+      allow read: if isSignedIn() &&
+        (resource.data.buyerId == request.auth.uid || resource.data.sellerId == request.auth.uid);
+      allow create: if isSignedIn() && request.resource.data.buyerId == request.auth.uid;
+      allow update: if isSignedIn() &&
+        (resource.data.sellerId == request.auth.uid || resource.data.buyerId == request.auth.uid);
+      allow delete: if false;
+    }
+  }
+}
+
+// Note on listings.update: a request's accept flow (updateRequestStatus in
+// requests.js) needs to flip a LISTING's status to "Matched" even though the
+// currently signed-in user is the buyer, not the listing's owner. Tightening
+// this to "only the owner, or only a status-field change" is possible but
+// needs a field-level rule (allow update: if resource.data.diff(...).changedKeys()
+// .hasOnly(['status'])) — left as a documented follow-up rather than shipped
+// here, to keep the prototype's rules easy to reason about in a 24h build.

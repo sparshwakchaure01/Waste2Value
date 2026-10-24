@@ -1,0 +1,40 @@
+:root {
+  /* Brand — Waste2Value design system. Roles are fixed, never swapped. */
+  --navy: #1C2430;      /* structure: nav, headers, primary text */
+  --ink: #262E3A;       /* body text */
+  --ink-soft: #5B5F6B;
+  --ink-faint: #8A8E98;
+
+  --teal: #2F6F62;      /* action: buttons that DO something */
+  --teal-tint: #E4EFEA;
+  --teal-deep: #234F45;
+
+  --gold: #AD8A52;      /* verified / value / premium */
+  --gold-deep: #8A6D3C;
+  --gold-tint: #F3E9D5;
+
+  --green: #3F7A53;     /* status only: available / accepted */
+  --green-tint: #E3EFE6;
+
+  --rose: #A1573C;      /* alert: declined / unavailable / hazardous */
+  --rose-tint: #F3E6DF;
+
+  --line: #E3E1DA;
+  --bg: #FBF9F5;
+  --surface: #FFFFFF;
+  --surface-alt: #F2EFE7;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-pill: 999px;
+
+  --shadow-sm: 0 1px 2px rgba(28,36,48,0.06), 0 1px 1px rgba(28,36,48,0.04);
+  --shadow-md: 0 8px 24px rgba(28,36,48,0.08);
+  --shadow-lg: 0 16px 40px rgba(28,36,48,0.14);
+
+  --font-head: 'Fraunces', Georgia, serif;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+
+  --ease: cubic-bezier(.16,.84,.3,1);
+}

@@ -1,0 +1,56 @@
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; } to { opacity: 1; }
+}
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(.96); } to { opacity: 1; transform: scale(1); }
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; } 50% { opacity: .55; }
+}
+@keyframes lockOpen {
+  0% { transform: rotate(0deg) scale(1); }
+  40% { transform: rotate(-8deg) scale(1.15); }
+  100% { transform: rotate(0deg) scale(1); opacity: 0; }
+}
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(16px); } to { opacity: 1; transform: translateX(0); }
+}
+@keyframes toastIn {
+  from { opacity: 0; transform: translateY(-10px) translateX(-50%); }
+  to { opacity: 1; transform: translateY(0) translateX(-50%); }
+}
+
+.page-body { animation: fadeUp .35s var(--ease); }
+.listing-card { animation: fadeUp .4s var(--ease) backwards; }
+.listing-card:nth-child(2) { animation-delay: .04s; }
+.listing-card:nth-child(3) { animation-delay: .08s; }
+.listing-card:nth-child(4) { animation-delay: .12s; }
+.listing-card:nth-child(5) { animation-delay: .16s; }
+.listing-card:nth-child(6) { animation-delay: .2s; }
+
+.modal-overlay { animation: fadeIn .2s var(--ease); }
+.modal { animation: scaleIn .25s var(--ease); }
+
+.reveal-lock-icon.unlocking { animation: lockOpen .5s var(--ease) forwards; }
+.reveal-contact-row { animation: slideInRight .35s var(--ease) backwards; }
+.reveal-contact-row:nth-child(1) { animation-delay: .15s; }
+.reveal-contact-row:nth-child(2) { animation-delay: .28s; }
+.reveal-contact-row:nth-child(3) { animation-delay: .41s; }
+.reveal-contact-row:nth-child(4) { animation-delay: .54s; }
+
+.pill-available { animation: pulse 2.4s ease-in-out infinite; }
+
+.toast {
+  position: fixed; top: 20px; left: 50%; z-index: 500;
+  background: var(--navy); color: #fff; padding: 12px 20px; border-radius: var(--radius-md);
+  font-size: 13.5px; font-weight: 600; box-shadow: var(--shadow-lg);
+  animation: toastIn .3s var(--ease);
+}
+.toast.success { background: var(--teal); }
+.toast.error { background: var(--rose); }
+
+.btn, .listing-card, .role-pick-card, .nav-link { will-change: transform; }
