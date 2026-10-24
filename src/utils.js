@@ -88,3 +88,63 @@ export function debounce(fn, delay = 300) {
   let t;
   return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), delay); };
 }
+
+const reducedMotion = () => window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// Animated number for stat cards.
+export function countUp(node, to, duration = 750) {
+  const target = Number(to) || 0;
+  if (reducedMotion() || target === 0) { node.textContent = String(target); return; }
+  const start = performance.now();
+  node.textContent = '0';
+  const tick = (now) => {
+    const t = Math.min(1, (now - start) / duration);
+    const eased = 1 - Math.pow(1 - t, 3);
+    node.textContent = String(Math.round(target * eased));
+    if (t < 1) requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
+
+export function counter(n) {
+  const node = el('div', { class: 'n' }, '0');
+  countUp(node, n);
+  return node;
+}
+
+export async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// ---------- skeleton loaders ----------
+const sk = (cls = '') => el('div', { class: `skeleton ${cls}` });
+
+export function skeletonCards(n = 6) {
+  const frag = document.createDocumentFragment();
+  for (let i = 0; i < n; i++) {
+    frag.appendChild(el('div', { class: 'card skeleton-card' }, [
+      sk('sk-photo'),
+      el('div', { class: 'listing-body' }, [sk('sk-line sk-short'), sk('sk-line'), sk('sk-line sk-mid')])
+    ]));
+  }
+  return frag;
+}
+
+export function skeletonRows(n = 3) {
+  const wrap = el('div', {});
+  for (let i = 0; i < n; i++) {
+    wrap.appendChild(el('div', { class: 'request-card' }, [sk('sk-line sk-mid'), sk('sk-line'), sk('sk-line sk-short')]));
+  }
+  return wrap;
+}
+
+export function skeletonStats(n = 3) {
+  const wrap = el('div', { class: 'stat-row' });
+  for (let i = 0; i < n; i++) wrap.appendChild(el('div', { class: 'stat-card' }, [sk('sk-num'), sk('sk-line sk-short')]));
+  return wrap;
+}

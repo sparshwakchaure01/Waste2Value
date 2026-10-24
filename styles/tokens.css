@@ -1,40 +1,48 @@
 :root {
-  /* Brand — Waste2Value design system. Roles are fixed, never swapped. */
-  --navy: #1C2430;      /* structure: nav, headers, primary text */
-  --ink: #262E3A;       /* body text */
-  --ink-soft: #5B5F6B;
-  --ink-faint: #8A8E98;
+  /* Brand — Waste2Value design system (palette A: midnight, emerald, brass, ivory).
+     Roles are fixed, never swapped. */
+  --navy: #0B1626;      /* structure: nav, headers, primary text */
+  --navy-2: #15263D;    /* lifted navy for gradients */
+  --ink: #1B2638;       /* body text */
+  --ink-soft: #566074;
+  --ink-faint: #8790A0;
 
-  --teal: #2F6F62;      /* action: buttons that DO something */
-  --teal-tint: #E4EFEA;
-  --teal-deep: #234F45;
+  --teal: #0F7B63;      /* action: emerald — buttons that DO something */
+  --teal-bright: #17977A;
+  --teal-tint: #DCEFE8;
+  --teal-deep: #0A5C4A;
 
-  --gold: #AD8A52;      /* verified / value / premium */
-  --gold-deep: #8A6D3C;
-  --gold-tint: #F3E9D5;
+  --gold: #C8A04A;      /* verified / value / premium: brass */
+  --gold-deep: #9A7829;
+  --gold-tint: #F6EBCE;
 
-  --green: #3F7A53;     /* status only: available / accepted */
-  --green-tint: #E3EFE6;
+  --green: #3A8C57;     /* status only: available / accepted */
+  --green-tint: #E1F1E6;
 
-  --rose: #A1573C;      /* alert: declined / unavailable / hazardous */
-  --rose-tint: #F3E6DF;
+  --rose: #B4513B;      /* alert: declined / unavailable / hazardous */
+  --rose-tint: #F8E5DF;
 
-  --line: #E3E1DA;
-  --bg: #FBF9F5;
+  --line: #E5E0D2;
+  --bg: #F8F5EE;
   --surface: #FFFFFF;
-  --surface-alt: #F2EFE7;
+  --surface-alt: #F1EDE1;
 
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 18px;
   --radius-pill: 999px;
 
-  --shadow-sm: 0 1px 2px rgba(28,36,48,0.06), 0 1px 1px rgba(28,36,48,0.04);
-  --shadow-md: 0 8px 24px rgba(28,36,48,0.08);
-  --shadow-lg: 0 16px 40px rgba(28,36,48,0.14);
+  --shadow-sm: 0 1px 2px rgba(11,22,38,0.07), 0 1px 1px rgba(11,22,38,0.04);
+  --shadow-md: 0 10px 28px rgba(11,22,38,0.10);
+  --shadow-lg: 0 18px 46px rgba(11,22,38,0.18);
+  --shadow-glow: 0 8px 22px rgba(15,123,99,0.32);
+
+  --grad-brand: linear-gradient(135deg, var(--teal-bright), var(--teal) 55%, var(--teal-deep));
+  --grad-nav: linear-gradient(180deg, var(--navy-2), var(--navy));
 
   --font-head: 'Fraunces', Georgia, serif;
   --font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
 
   --ease: cubic-bezier(.16,.84,.3,1);
+  --spring: cubic-bezier(.34,1.56,.64,1);
 }

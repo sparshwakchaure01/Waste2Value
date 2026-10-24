@@ -54,3 +54,12 @@
 .toast.error { background: var(--rose); }
 
 .btn, .listing-card, .role-pick-card, .nav-link { will-change: transform; }
+
+@keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+@keyframes ripple { to { transform: scale(1); opacity: 0; } }
+@keyframes starPop { 0% { transform: scale(.6); } 60% { transform: scale(1.35) rotate(12deg); } 100% { transform: scale(1); } }
+@keyframes badgePop { from { transform: scale(0); } to { transform: scale(1); } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}

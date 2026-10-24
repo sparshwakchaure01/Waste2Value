@@ -1,4 +1,4 @@
-import { el, timeAgo } from '../utils.js';
+import { el, timeAgo, counter, skeletonStats } from '../utils.js';
 import { state } from '../state.js';
 import { navigate } from '../router.js';
 import { getUserListings } from '../services/listings.js';
@@ -23,12 +23,15 @@ export async function renderDashboard(container) {
 
 async function renderIndustryDashboard(container) {
   const uid = state.firebaseUser.uid;
+  const skeleton = skeletonStats(3);
+  container.appendChild(skeleton);
   const [listings, incoming, outgoing] = await Promise.all([
     getUserListings(uid), getIncomingRequests(uid), getOutgoingRequests(uid)
   ]);
+  skeleton.remove();
 
   const pendingIncoming = incoming.filter(r => r.status === 'pending' || r.status === 'discussing');
-  const accepted = [...incoming, ...outgoing].filter(r => r.status === 'accepted');
+  const accepted = [...incoming, ...outgoing].filter(r => r.status === 'accepted' || r.status === 'completed');
 
   container.appendChild(el('div', { class: 'stat-row' }, [
     statCard(listings.length, 'My Listings'),
@@ -63,7 +66,10 @@ async function renderIndustryDashboard(container) {
 
 async function renderLogisticsDashboardHome(container) {
   const districts = state.userDoc.districts || [];
+  const skeleton = skeletonStats(2);
+  container.appendChild(skeleton);
   const deals = await getAcceptedDealsForDistricts(districts);
+  skeleton.remove();
 
   container.appendChild(el('div', { class: 'stat-row' }, [
     statCard(districts.length, 'Districts Covered'),
@@ -82,7 +88,7 @@ async function renderLogisticsDashboardHome(container) {
 
 function statCard(n, label) {
   return el('div', { class: 'stat-card' }, [
-    el('div', { class: 'n' }, String(n)),
+    counter(n),
     el('div', { class: 'l' }, label)
   ]);
 }

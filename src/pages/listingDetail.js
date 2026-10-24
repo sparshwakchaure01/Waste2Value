@@ -1,4 +1,4 @@
-import { el, toast } from '../utils.js';
+import { el, toast, skeletonRows } from '../utils.js';
 import { state } from '../state.js';
 import { navigate, renderRoute } from '../router.js';
 import { getListingById } from '../services/listings.js';
@@ -7,7 +7,10 @@ import { fetchUserDoc } from '../auth.js';
 import { renderRevealCard } from '../components/blindReveal.js';
 
 export async function renderListingDetail(container, params) {
-  const listing = await getListingById(params.id);
+  const skeleton = skeletonRows(2);
+  container.appendChild(skeleton);
+  let listing;
+  try { listing = await getListingById(params.id); } finally { skeleton.remove(); }
   if (!listing) {
     container.appendChild(el('div', { class: 'empty-state' }, [el('div', { class: 'ic' }, '❓'), el('p', {}, 'Listing not found.')]));
     return;

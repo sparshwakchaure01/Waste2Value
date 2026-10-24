@@ -1,4 +1,4 @@
-import { el, initials, formatDate } from '../utils.js';
+import { el, initials, formatDate, counter } from '../utils.js';
 import { getAllUsers, getPlatformStats } from '../services/admin.js';
 import { ADMIN_EMAILS } from '../data/categories.js';
 import { isAdminEmail } from '../auth.js';
@@ -63,5 +63,5 @@ export async function renderAdmin(container) {
 }
 
 function statCard(n, label) {
-  return el('div', { class: 'stat-card' }, [el('div', { class: 'n' }, String(n)), el('div', { class: 'l' }, label)]);
+  return el('div', { class: 'stat-card' }, [counter(n), el('div', { class: 'l' }, label)]);
 }
