@@ -1,8 +1,8 @@
 import {
-  collection, addDoc, doc, getDocs, updateDoc, query, where, orderBy, serverTimestamp, getDoc
+  collection, addDoc, doc, getDocs, updateDoc, query, where, serverTimestamp, getDoc
 } from 'firebase/firestore';
 import { db } from '../firebase.js';
-import { updateListingStatus } from './listings.js';
+import { updateListingStatus, newestFirst } from './listings.js';
 
 const COL = 'requests';
 
@@ -28,15 +28,15 @@ export async function sendRequest({ listing, buyerId, message }) {
 }
 
 export async function getIncomingRequests(sellerId) {
-  const q = query(collection(db, COL), where('sellerId', '==', sellerId), orderBy('createdAt', 'desc'));
+  const q = query(collection(db, COL), where('sellerId', '==', sellerId));
   const snap = await getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  return snap.docs.map(d => ({ id: d.id, ...d.data() })).sort(newestFirst);
 }
 
 export async function getOutgoingRequests(buyerId) {
-  const q = query(collection(db, COL), where('buyerId', '==', buyerId), orderBy('createdAt', 'desc'));
+  const q = query(collection(db, COL), where('buyerId', '==', buyerId));
   const snap = await getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  return snap.docs.map(d => ({ id: d.id, ...d.data() })).sort(newestFirst);
 }
 
 export async function updateRequestStatus(requestId, status, listingId) {
@@ -62,8 +62,8 @@ export function revealLevel(status) {
 // listing district matches one of the operator's selected districts.
 export async function getAcceptedDealsForDistricts(districts) {
   if (!districts || !districts.length) return [];
-  const q = query(collection(db, COL), where('status', '==', 'accepted'), orderBy('createdAt', 'desc'));
+  const q = query(collection(db, COL), where('status', '==', 'accepted'));
   const snap = await getDocs(q);
-  const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  const all = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort(newestFirst);
   return all.filter(r => districts.includes(r.district));
 }

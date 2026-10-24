@@ -1,5 +1,5 @@
 import {
-  collection, addDoc, doc, getDoc, getDocs, updateDoc, query, where, orderBy, serverTimestamp
+  collection, addDoc, doc, getDoc, getDocs, updateDoc, query, where, serverTimestamp
 } from 'firebase/firestore';
 import { db } from '../firebase.js';
 
@@ -31,16 +31,23 @@ export async function getListingById(id) {
 
 // Fetch by status (single Firestore `where`, avoids needing composite indexes),
 // then apply the rest of the filters client-side. Fine at hackathon/MVP scale.
+// NOTE: where() + orderBy() on a different field needs a composite index, so
+// newest-first ordering is done client-side (see newestFirst) instead.
+export function newestFirst(a, b) {
+  const t = x => (x.createdAt?.toMillis ? x.createdAt.toMillis() : Date.now());
+  return t(b) - t(a);
+}
+
 export async function getListings({ status = 'Available' } = {}) {
-  const q = query(collection(db, COL), where('status', '==', status), orderBy('createdAt', 'desc'));
+  const q = query(collection(db, COL), where('status', '==', status));
   const snap = await getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  return snap.docs.map(d => ({ id: d.id, ...d.data() })).sort(newestFirst);
 }
 
 export async function getUserListings(ownerId) {
-  const q = query(collection(db, COL), where('ownerId', '==', ownerId), orderBy('createdAt', 'desc'));
+  const q = query(collection(db, COL), where('ownerId', '==', ownerId));
   const snap = await getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  return snap.docs.map(d => ({ id: d.id, ...d.data() })).sort(newestFirst);
 }
 
 export async function updateListingStatus(id, status) {
