@@ -2,9 +2,11 @@ import { el, timeAgo, toast, skeletonRows } from '../utils.js';
 import { state } from '../state.js';
 import { navigate } from '../router.js';
 import { getIncomingRequests, getOutgoingRequests, updateRequestStatus, revealLevel } from '../services/requests.js';
+import { getLogisticsPartners, getTransportsForUser, sendTransportRequest, transportRevealLevel } from '../services/transports.js';
 import { fetchUserDoc } from '../auth.js';
 import { renderRevealCard } from '../components/blindReveal.js';
 import { refreshNavBadge } from '../components/nav.js';
+import { emptyState } from '../components/emptyState.js';
 
 const STATUS_FILTERS = [
   ['all', 'All'],
@@ -17,6 +19,8 @@ const STATUS_FILTERS = [
 
 const statusPill = s =>
   s === 'pending' ? 'reserved' : s === 'accepted' || s === 'completed' ? 'matched' : s === 'discussing' ? 'available' : 'declined';
+const transportPill = s => (s === 'pending' ? 'reserved' : s === 'declined' ? 'declined' : 'matched');
+const transportLabel = s => (s === 'completed' ? 'picked up' : s);
 
 // Status timeline: Sent → Discussing → Accepted → Picked up (or Sent → Declined).
 function timeline(status) {
@@ -32,7 +36,7 @@ function timeline(status) {
 
 export async function renderMatches(container) {
   container.appendChild(el('div', { class: 'page-header' }, [
-    el('div', {}, [el('h1', {}, 'Matches'), el('p', {}, 'Requests you’ve received and sent — one message, then Decline, Discuss, or Accept.')])
+    el('div', {}, [el('h1', {}, 'Matches'), el('p', {}, 'Requests you’ve received and sent — one message, then Decline, Discuss, or Accept. Accepted deals can book a transport partner.')])
   ]));
 
   const tabBar = el('div', { class: 'tab-bar' });
@@ -47,6 +51,7 @@ export async function renderMatches(container) {
   let active = 'incoming';
   let filter = 'all';
   const cache = {};
+  const uid = state.firebaseUser.uid;
 
   function drawTabs() {
     tabBar.innerHTML = '';
@@ -72,7 +77,6 @@ export async function renderMatches(container) {
   async function drawBody(force = false) {
     body.innerHTML = '';
     body.appendChild(skeletonRows(3));
-    const uid = state.firebaseUser.uid;
     try {
       if (force || !cache[active]) {
         cache[active] = active === 'incoming' ? await getIncomingRequests(uid) : await getOutgoingRequests(uid);
@@ -80,7 +84,7 @@ export async function renderMatches(container) {
     } catch (err) {
       console.error(err);
       body.innerHTML = '';
-      body.appendChild(el('div', { class: 'empty-state' }, [el('div', { class: 'ic' }, '⚠️'), el('p', {}, 'Could not load requests.')]));
+      body.appendChild(emptyState('requests', 'Could not load requests.'));
       return;
     }
     drawSeg(cache[active]);
@@ -91,16 +95,73 @@ export async function renderMatches(container) {
     const shown = filter === 'all' ? list : list.filter(r => r.status === filter);
     const frag = [];
     if (!shown.length) {
-      frag.push(el('div', { class: 'empty-state' }, [
-        el('div', { class: 'ic' }, '📭'),
-        el('p', {}, list.length
-          ? 'No requests with this status.'
-          : (active === 'incoming' ? 'No requests received yet.' : 'You haven’t sent any requests yet.'))
-      ]));
+      frag.push(emptyState('requests', list.length
+        ? 'No requests with this status.'
+        : (active === 'incoming' ? 'No requests received yet.' : 'You haven’t sent any requests yet.'),
+        !list.length && active === 'outgoing' ? el('button', { class: 'btn btn-primary', onclick: () => navigate('marketplace') }, 'Browse Marketplace') : null));
     } else {
       for (const r of shown) frag.push(await requestCard(r, active));
     }
     body.replaceChildren(...frag);
+  }
+
+  // ---- transport partners for an accepted deal (same district) ----
+  function partnersPanel(r) {
+    const panel = el('div', { class: 'partners' });
+    const heading = el('h4', {}, `Transport partners in ${r.district}`);
+
+    async function fill() {
+      panel.replaceChildren(heading, skeletonRows(1));
+      let partners, transports;
+      try {
+        [partners, transports] = await Promise.all([getLogisticsPartners(r.district), getTransportsForUser(uid)]);
+      } catch (err) {
+        console.error(err);
+        panel.replaceChildren(heading, el('p', { class: 'text-faint' }, 'Could not load transport partners.'));
+        return;
+      }
+      const mine = transports.filter(t => t.requestId === r.id);
+      if (!partners.length) {
+        panel.replaceChildren(heading, el('p', { class: 'text-faint' }, `No logistics partner covers ${r.district} yet. Check back soon.`));
+        return;
+      }
+      panel.replaceChildren(heading, ...partners.map(p => partnerRow(p, mine.find(t => t.logisticsId === p.id))));
+    }
+
+    function partnerRow(p, transport) {
+      const row = el('div', { class: 'partner' });
+      const sub = [p.vehicleType, `${(p.districts || []).length} district${(p.districts || []).length === 1 ? '' : 's'}`].filter(Boolean).join(' · ');
+      const head = el('div', { class: 'partner-row' }, [
+        el('div', {}, [el('div', { class: 'partner-name' }, p.companyName || p.name || 'Logistics partner'), el('div', { class: 'partner-sub' }, sub)])
+      ]);
+      if (transport) {
+        head.appendChild(el('span', { class: `pill pill-${transportPill(transport.status)}` }, transportLabel(transport.status)));
+      } else {
+        const btn = el('button', { class: 'btn btn-primary btn-sm' }, 'Request transport');
+        btn.addEventListener('click', async () => {
+          btn.disabled = true; btn.textContent = 'Sending…';
+          try {
+            await sendTransportRequest({ request: r, partner: p, requesterId: uid });
+            toast('Transport request sent.', 'success');
+            fill();
+          } catch (err) {
+            console.error(err);
+            toast(err.code === 'permission-denied' ? 'Not allowed — publish the latest Firestore rules.' : 'Could not send the request.', 'error');
+            btn.disabled = false; btn.textContent = 'Request transport';
+          }
+        });
+        head.appendChild(btn);
+      }
+      row.appendChild(head);
+      if (transport) {
+        const level = transportRevealLevel(transport.status);
+        if (level !== 'none') row.appendChild(renderRevealCard(level, p, 'Partner'));
+      }
+      return row;
+    }
+
+    fill();
+    return panel;
   }
 
   async function requestCard(r, mode) {
@@ -117,6 +178,7 @@ export async function renderMatches(container) {
         ]),
         el('span', { class: `pill pill-${statusPill(r.status)}` }, r.status === 'completed' ? 'picked up' : r.status)
       ]),
+      r.offeredQty ? el('div', { class: 'meta-chips' }, [el('span', { class: 'pill pill-neutral' }, `Wants ${r.offeredQty} ${r.unit}`)]) : null,
       timeline(r.status),
       el('p', { class: 'mt-16', style: 'font-style:italic;' }, `“${r.message}”`),
       el('a', { class: 'nav-link link-inline', onclick: () => navigate(`listing/${r.listingId}`) }, 'View listing →')
@@ -136,6 +198,8 @@ export async function renderMatches(container) {
       card.appendChild(el('div', { class: 'flex gap-12 mt-16' }, [declineBtn, actionBtn]));
     }
 
+    if (r.status === 'accepted') card.appendChild(partnersPanel(r));
+
     return card;
   }
 
@@ -143,7 +207,7 @@ export async function renderMatches(container) {
     buttons.forEach(b => { b.disabled = true; });
     try {
       await updateRequestStatus(r.id, newStatus, r.listingId);
-      toast(newStatus === 'accepted' ? 'Deal accepted!' : newStatus === 'discussing' ? 'Contact details unlocked for discussion.' : 'Request declined.', 'success');
+      toast(newStatus === 'accepted' ? 'Deal accepted! Pick a transport partner below.' : newStatus === 'discussing' ? 'Contact details unlocked for discussion.' : 'Request declined.', 'success');
       await drawBody(true);
       refreshNavBadge(true);
     } catch (err) {

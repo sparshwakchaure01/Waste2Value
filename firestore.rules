@@ -68,7 +68,7 @@ service cloud.firestore {
     // can read accepted/completed deals; admins can read all (analytics).
     // A buyer creates a 'pending' request against a listing's real owner.
     // Only the seller can change status — the buyer cannot self-accept — plus a
-    // logistics operator may mark an accepted deal in their districts as picked up.
+    // logistics partner may mark a deal they accepted a transport for as picked up.
     match /requests/{requestId} {
       allow read: if isSignedIn() && (
         resource.data.buyerId == request.auth.uid ||
@@ -85,11 +85,42 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
         && (
           resource.data.sellerId == request.auth.uid ||
-          // logistics operator confirming pickup of an accepted deal in their own districts
+          // logistics partner completing a pickup they accepted via a transport request
           (isLogistics()
             && resource.data.status == 'accepted'
             && request.resource.data.status == 'completed'
-            && resource.data.district in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.districts)
+            && get(/databases/$(database)/documents/transports/$(requestId + '_' + request.auth.uid)).data.status == 'accepted')
+        );
+      allow delete: if false;
+    }
+
+    // Transport requests: a buyer or seller of an ACCEPTED deal asks a logistics partner who
+    // serves the deal's district. Doc id = requestId_logisticsId. Only that partner can
+    // accept/decline (pending) or complete (accepted) it.
+    match /transports/{transportId} {
+      allow read: if isSignedIn() && (
+        resource.data.logisticsId == request.auth.uid ||
+        resource.data.requesterId == request.auth.uid ||
+        resource.data.sellerId == request.auth.uid ||
+        resource.data.buyerId == request.auth.uid ||
+        isAdmin()
+      );
+      allow create: if isSignedIn()
+        && request.resource.data.requesterId == request.auth.uid
+        && request.resource.data.status == 'pending'
+        && (request.resource.data.sellerId == request.auth.uid || request.resource.data.buyerId == request.auth.uid)
+        && transportId == request.resource.data.requestId + '_' + request.resource.data.logisticsId
+        && get(/databases/$(database)/documents/requests/$(request.resource.data.requestId)).data.status == 'accepted'
+        && get(/databases/$(database)/documents/requests/$(request.resource.data.requestId)).data.sellerId == request.resource.data.sellerId
+        && get(/databases/$(database)/documents/requests/$(request.resource.data.requestId)).data.buyerId == request.resource.data.buyerId
+        && get(/databases/$(database)/documents/requests/$(request.resource.data.requestId)).data.district == request.resource.data.district
+        && get(/databases/$(database)/documents/users/$(request.resource.data.logisticsId)).data.role == 'logistics'
+        && request.resource.data.district in get(/databases/$(database)/documents/users/$(request.resource.data.logisticsId)).data.districts;
+      allow update: if isSignedIn() && resource.data.logisticsId == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
+        && (
+          (resource.data.status == 'pending' && request.resource.data.status in ['accepted', 'declined']) ||
+          (resource.data.status == 'accepted' && request.resource.data.status == 'completed')
         );
       allow delete: if false;
     }
