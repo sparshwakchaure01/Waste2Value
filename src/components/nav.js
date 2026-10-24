@@ -3,6 +3,7 @@ import { state } from '../state.js';
 import { signOutUser } from '../auth.js';
 import { navigate } from '../router.js';
 import { ADMIN_EMAILS } from '../data/categories.js';
+import { brandLockup } from './logo.js';
 
 export function renderNav() {
   const currentHash = window.location.hash.replace(/^#\/?/, '').split('/')[0];
@@ -29,10 +30,7 @@ export function renderNav() {
       el('div', {
         class: 'brand',
         onclick: () => navigate(role ? 'dashboard' : '')
-      }, [
-        el('div', { class: 'brand-mark' }, '♻️'),
-        'Waste2Value'
-      ]),
+      }, brandLockup()),
       el('div', { class: 'nav-links' },
         links.map(l => el('a', {
           class: `nav-link ${currentHash === l.path ? 'active' : ''}`,

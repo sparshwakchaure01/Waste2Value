@@ -2,6 +2,7 @@ import { el, toast } from '../utils.js';
 import { state, setState } from '../state.js';
 import { createUserProfile } from '../auth.js';
 import { navigate } from '../router.js';
+import { icon } from '../components/logo.js';
 import { MAHARASHTRA_DISTRICTS } from '../data/districts.js';
 
 export function renderOnboarding(container) {
@@ -18,12 +19,12 @@ export function renderOnboarding(container) {
     if (!selectedRole) {
       const grid = el('div', { class: 'role-pick-grid', style: 'margin-top:28px;' }, [
         el('div', { class: 'role-pick-card', onclick: () => { selectedRole = 'industry'; draw(); } }, [
-          el('div', { class: 'ic' }, '🏭'),
+          el('div', { class: 'ic' }, icon('factory', 30)),
           el('h3', {}, 'Industry'),
           el('p', {}, 'Buy or sell plastic scrap and by-products.')
         ]),
         el('div', { class: 'role-pick-card', onclick: () => { selectedRole = 'logistics'; draw(); } }, [
-          el('div', { class: 'ic' }, '🚚'),
+          el('div', { class: 'ic' }, icon('truck', 30)),
           el('h3', {}, 'Logistics'),
           el('p', {}, 'List your vehicle and pick up completed deals.')
         ])
