@@ -1,5 +1,6 @@
 import { $ } from './utils.js';
 import { state } from './state.js';
+import { ADMIN_EMAILS } from './data/categories.js';
 
 import { renderLanding } from './pages/landing.js';
 import { renderOnboarding } from './pages/onboarding.js';
@@ -16,12 +17,12 @@ const routes = [
   { path: '', auth: false, render: renderLanding },
   { path: 'onboarding', auth: true, render: renderOnboarding },
   { path: 'dashboard', auth: true, requiresRole: true, render: renderDashboard },
-  { path: 'marketplace', auth: true, requiresRole: true, render: renderMarketplace },
-  { path: 'listing/:id', auth: true, requiresRole: true, render: renderListingDetail },
-  { path: 'create-listing', auth: true, requiresRole: true, render: renderCreateListing },
-  { path: 'matches', auth: true, requiresRole: true, render: renderMatches },
-  { path: 'logistics', auth: true, requiresRole: true, render: renderLogistics },
-  { path: 'admin', auth: true, requiresRole: true, render: renderAdmin },
+  { path: 'marketplace', auth: true, requiresRole: true, roles: ['industry'], render: renderMarketplace },
+  { path: 'listing/:id', auth: true, requiresRole: true, roles: ['industry'], render: renderListingDetail },
+  { path: 'create-listing', auth: true, requiresRole: true, roles: ['industry'], render: renderCreateListing },
+  { path: 'matches', auth: true, requiresRole: true, roles: ['industry'], render: renderMatches },
+  { path: 'logistics', auth: true, requiresRole: true, roles: ['logistics'], render: renderLogistics },
+  { path: 'admin', auth: true, requiresRole: true, adminOnly: true, render: renderAdmin },
 ];
 
 function matchRoute(hash) {
@@ -72,10 +73,16 @@ export function renderRoute() {
   if (route.path === 'onboarding' && state.userDoc) { navigate('dashboard'); return; }
   if (route.path === '' && state.firebaseUser && state.userDoc) { navigate('dashboard'); return; }
 
+  if (route.roles && state.userDoc && !route.roles.includes(state.userDoc.role)) { navigate('dashboard'); return; }
+  if (route.adminOnly && !ADMIN_EMAILS.includes(state.firebaseUser?.email)) { navigate('dashboard'); return; }
+
   app.innerHTML = '';
   if (route.path !== '') app.appendChild(renderNav());
   const body = document.createElement('div');
   body.className = route.path === '' ? 'page-body' : 'container page-body';
   app.appendChild(body);
-  route.render(body, params);
+  Promise.resolve(route.render(body, params)).catch(err => {
+    console.error(err);
+    body.innerHTML = `<div class="empty-state"><div class="ic">⚠️</div><h3>Something went wrong</h3><p>${err.code || err.message || 'Please try again.'}</p></div>`;
+  });
 }

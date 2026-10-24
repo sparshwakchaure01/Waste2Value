@@ -6,7 +6,8 @@ export function el(tag, attrs = {}, children = []) {
   for (const [k, v] of Object.entries(attrs)) {
     if (k === 'class') node.className = v;
     else if (k.startsWith('on') && typeof v === 'function') node.addEventListener(k.slice(2).toLowerCase(), v);
-    else if (v !== undefined && v !== null) node.setAttribute(k, v);
+    else if (v === true) node.setAttribute(k, '');
+    else if (v !== undefined && v !== null && v !== false) node.setAttribute(k, v);
   }
   (Array.isArray(children) ? children : [children]).forEach(c => {
     if (c === null || c === undefined) return;

@@ -69,9 +69,7 @@ export async function renderMatches(container) {
       el('a', { class: 'nav-link', style: 'cursor:pointer;', onclick: () => navigate(`listing/${r.listingId}`) }, 'View listing →')
     ]);
 
-    if (level !== 'none') {
-      card.appendChild(renderRevealCard(level, otherUser, otherLabel));
-    }
+    card.appendChild(renderRevealCard(level, otherUser, otherLabel));
 
     if (mode === 'incoming' && (r.status === 'pending' || r.status === 'discussing')) {
       const declineBtn = el('button', { class: 'btn btn-outline btn-sm' }, 'Decline');

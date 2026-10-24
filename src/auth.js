@@ -48,7 +48,13 @@ export function listenAuthState(onReady) {
       onReady();
       return;
     }
-    const userDoc = await fetchUserDoc(user.uid);
+    let userDoc = null;
+    try {
+      userDoc = await fetchUserDoc(user.uid);
+    } catch (err) {
+      console.error('Could not load user profile', err);
+      toast('Could not load your profile — check Firestore rules and connection.', 'error');
+    }
     setState({ firebaseUser: user, userDoc, loadingAuth: false });
     onReady();
   });

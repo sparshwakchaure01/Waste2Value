@@ -1,6 +1,6 @@
 import { el, toast } from '../utils.js';
 import { state } from '../state.js';
-import { navigate } from '../router.js';
+import { navigate, renderRoute } from '../router.js';
 import { getListingById } from '../services/listings.js';
 import { sendRequest, getOutgoingRequests, revealLevel } from '../services/requests.js';
 import { fetchUserDoc } from '../auth.js';
@@ -96,8 +96,7 @@ function openRequestModal(listing) {
       await sendRequest({ listing, buyerId: state.firebaseUser.uid, message });
       toast('Request sent!', 'success');
       overlay.remove();
-      navigate(`listing/${listing.id}`);
-      setTimeout(() => window.location.reload(), 150);
+      renderRoute();
     } catch (err) {
       console.error(err);
       toast('Could not send request.', 'error');
