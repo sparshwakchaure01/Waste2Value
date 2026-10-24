@@ -1,5 +1,5 @@
 import {
-  collection, addDoc, doc, getDoc, getDocs, updateDoc, query, where, serverTimestamp
+  collection, addDoc, doc, getDoc, getDocs, updateDoc, deleteDoc, query, where, serverTimestamp
 } from 'firebase/firestore';
 import { db } from '../firebase.js';
 
@@ -17,7 +17,8 @@ export async function createListing(ownerId, data) {
     frequencyQty: data.frequencyQty ? Number(data.frequencyQty) : null,
     status: 'Available',
     description: data.description || '',
-    photoBase64: data.photoBase64 || null,
+    photos: data.photos || [],
+    photoBase64: (data.photos && data.photos[0]) || null,
     district: data.district,
     createdAt: serverTimestamp()
   });
@@ -85,3 +86,33 @@ export function sortListings(listings, key = 'newest') {
   if (key === 'qty-desc') return out.sort((a, b) => inKg(b) - inKg(a));
   return out.sort(newestFirst);
 }
+
+// Photos are stored as base64 data URLs: `photos` (up to 4), with the first mirrored in photoBase64.
+export function listingPhotos(l) {
+  if (l.photos && l.photos.length) return l.photos;
+  return l.photoBase64 ? [l.photoBase64] : [];
+}
+
+export async function updateListing(id, data) {
+  await updateDoc(doc(db, COL, id), {
+    category: data.category,
+    grade: data.grade,
+    quantity: Number(data.quantity),
+    unit: data.unit,
+    costPerKg: Number(data.costPerKg),
+    availabilityFrequency: data.availabilityFrequency,
+    frequencyQty: data.frequencyQty ? Number(data.frequencyQty) : null,
+    description: data.description || '',
+    photos: data.photos || [],
+    photoBase64: (data.photos && data.photos[0]) || null,
+    district: data.district,
+    ...(data.status ? { status: data.status } : {})
+  });
+}
+
+export async function deleteListing(id) {
+  await deleteDoc(doc(db, COL, id));
+}
+
+export const totalKg = l => Number(l.quantity) * (l.unit === 'tonnes' ? 1000 : 1);
+export const estimatedValue = l => totalKg(l) * Number(l.costPerKg || 0);

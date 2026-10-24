@@ -8,12 +8,13 @@ const COL = 'requests';
 
 // status: 'pending' -> 'declined' | 'discussing' -> 'accepted' | 'declined' -> (logistics) 'completed'
 
-export async function sendRequest({ listing, buyerId, message }) {
+export async function sendRequest({ listing, buyerId, message, offeredQty = null }) {
   const ref = await addDoc(collection(db, COL), {
     listingId: listing.id,
     sellerId: listing.ownerId,
     buyerId,
     message,
+    offeredQty: offeredQty ? Number(offeredQty) : null,
     status: 'pending',
     // denormalized snapshot so the logistics dashboard & lists don't need extra reads
     category: listing.category,

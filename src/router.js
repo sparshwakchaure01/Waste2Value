@@ -7,11 +7,12 @@ import { renderOnboarding } from './pages/onboarding.js';
 import { renderDashboard } from './pages/dashboard.js';
 import { renderMarketplace } from './pages/marketplace.js';
 import { renderListingDetail } from './pages/listingDetail.js';
-import { renderCreateListing } from './pages/createListing.js';
+import { renderCreateListing, renderEditListing } from './pages/createListing.js';
 import { renderMatches } from './pages/matches.js';
 import { renderLogistics } from './pages/logistics.js';
 import { renderAdmin } from './pages/admin.js';
 import { renderAdminLogin } from './pages/adminLogin.js';
+import { renderMyListings } from './pages/myListings.js';
 import { renderNav } from './components/nav.js';
 
 const routes = [
@@ -21,6 +22,8 @@ const routes = [
   { path: 'marketplace', auth: true, requiresRole: true, roles: ['industry'], render: renderMarketplace },
   { path: 'listing/:id', auth: true, requiresRole: true, roles: ['industry'], render: renderListingDetail },
   { path: 'create-listing', auth: true, requiresRole: true, roles: ['industry'], render: renderCreateListing },
+  { path: 'my-listings', auth: true, requiresRole: true, roles: ['industry'], render: renderMyListings },
+  { path: 'edit-listing/:id', auth: true, requiresRole: true, roles: ['industry'], render: renderEditListing },
   { path: 'matches', auth: true, requiresRole: true, roles: ['industry'], render: renderMatches },
   { path: 'logistics', auth: true, requiresRole: true, roles: ['logistics'], render: renderLogistics },
   { path: 'admin-login', auth: false, render: renderAdminLogin },
