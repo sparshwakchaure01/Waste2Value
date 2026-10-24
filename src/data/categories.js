@@ -22,7 +22,11 @@ export const LISTING_STATUSES = ["Available", "Reserved", "Matched", "Unavailabl
 
 export const UNITS = ["kg", "tonnes"];
 
-// Admin emails — add your own email here to see the Admin link in the nav.
+// Admin emails — these Google accounts see the Admin link in the nav.
+// Keep in sync with isAdmin() in firestore.rules.
 export const ADMIN_EMAILS = [
-  // "you@example.com",
+  "wakchauresparsh77@gmail.com",
+  "yashhande9529@gmail.com",
+  "mahalechetan648@gmail.com",
+  "ndfirodiya@gmail.com",
 ];

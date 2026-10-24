@@ -4,71 +4,85 @@ rules_version = '2';
 //
 // KNOWN LIMITATION (documented honestly, see README.md "Security model"):
 // True field-level confidentiality — hiding a seller's phone/company fields
-// from a buyer's Firestore document reads until both sides accept — normally
-// needs server-side logic (e.g. a Cloud Function that returns a redacted
-// view). Cloud Functions require Firebase's paid Blaze plan. On the free
-// Spark plan there is no server compute, so these rules can only gate
-// collection-level access (who can read/write which documents), not
-// which *fields* inside a document a client is allowed to see.
+// from a buyer's Firestore reads until both sides accept — normally needs
+// server-side logic (e.g. a Cloud Function returning a redacted view). Cloud
+// Functions require Firebase's paid Blaze plan. On the free Spark plan there
+// is no server compute, so these rules can only gate DOCUMENT-level access
+// (who can read/write which documents), not which *fields* inside an allowed
+// document a client may see.
 //
-// For this prototype, the "Blind Reveal" confidentiality flow is therefore
-// enforced at the APPLICATION layer: the UI only ever requests/display
-// contact fields when src/services/requests.js's revealLevel(status)
-// says it's allowed. A user who opened devtools and queried Firestore
-// directly could read another user's full profile earlier than the UI
-// shows it. This is a known, accepted trade-off for a hackathon-scale
-// free-tier build — upgrading to Blaze + Cloud Functions (or Firestore
-// field-level App Check + Functions) would close this gap for production.
-
-function isSignedIn() {
-  return request.auth != null;
-}
-
-function isOwner(uid) {
-  return isSignedIn() && request.auth.uid == uid;
-}
+// The "Blind Reveal" confidentiality flow is therefore enforced at the
+// APPLICATION layer: the UI only displays contact fields when
+// src/services/requests.js's revealLevel(status) allows it. A user who opened
+// devtools and queried Firestore directly could read another user's profile
+// earlier than the UI shows it. This is a known, accepted trade-off for a
+// free-tier prototype; Blaze + Cloud Functions would close the gap.
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Users: anyone signed in can read profiles (needed to show the other
-    // side's name/phone once revealLevel allows it, and for the admin
-    // panel's user list). A user can only create/update their own doc.
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    // Keep in sync with ADMIN_EMAILS in src/data/categories.js
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.email in [
+        'wakchauresparsh77@gmail.com',
+        'yashhande9529@gmail.com',
+        'mahalechetan648@gmail.com',
+        'ndfirodiya@gmail.com'
+      ];
+    }
+
+    function isLogistics() {
+      return isSignedIn() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'logistics';
+    }
+
+    // Users: any signed-in user can read profiles (needed to show the other
+    // side's details once revealLevel allows it, and for the admin user list).
+    // A user can only create/update their own doc, and can't change their role.
     match /users/{userId} {
       allow read: if isSignedIn();
-      allow create: if isOwner(userId);
-      allow update: if isOwner(userId);
+      allow create: if isOwner(userId) && request.resource.data.role in ['industry', 'logistics'];
+      allow update: if isOwner(userId) && request.resource.data.role == resource.data.role;
       allow delete: if false;
     }
 
-    // Listings: anyone signed in can read (marketplace browsing). Only the
-    // owner can create a listing under their own uid, or update/delete it.
+    // Listings: anyone signed in can browse. Only the owner (the seller) can
+    // create, update (incl. flipping status to "Matched" on accept) or delete.
     match /listings/{listingId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid;
-      allow update: if isSignedIn() &&
-        (resource.data.ownerId == request.auth.uid || true); // see note below
+      allow update: if isSignedIn() && resource.data.ownerId == request.auth.uid
+        && request.resource.data.ownerId == resource.data.ownerId;
       allow delete: if isSignedIn() && resource.data.ownerId == request.auth.uid;
     }
 
-    // Requests: readable by the buyer or seller involved. Any signed-in user
-    // can create a request as its buyer. Only the seller can update its
-    // status (decline/discuss/accept); the buyer cannot self-accept.
+    // Requests: readable by the buyer or seller involved; logistics operators
+    // can read accepted/completed deals; admins can read all (analytics).
+    // A buyer creates a 'pending' request against a listing's real owner.
+    // Only the seller can change status — the buyer cannot self-accept.
     match /requests/{requestId} {
-      allow read: if isSignedIn() &&
-        (resource.data.buyerId == request.auth.uid || resource.data.sellerId == request.auth.uid);
-      allow create: if isSignedIn() && request.resource.data.buyerId == request.auth.uid;
-      allow update: if isSignedIn() &&
-        (resource.data.sellerId == request.auth.uid || resource.data.buyerId == request.auth.uid);
+      allow read: if isSignedIn() && (
+        resource.data.buyerId == request.auth.uid ||
+        resource.data.sellerId == request.auth.uid ||
+        (resource.data.status in ['accepted', 'completed'] && isLogistics()) ||
+        isAdmin()
+      );
+      allow create: if isSignedIn()
+        && request.resource.data.buyerId == request.auth.uid
+        && request.resource.data.status == 'pending'
+        && request.resource.data.sellerId ==
+           get(/databases/$(database)/documents/listings/$(request.resource.data.listingId)).data.ownerId;
+      allow update: if isSignedIn() && resource.data.sellerId == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']);
       allow delete: if false;
     }
   }
 }
-
-// Note on listings.update: a request's accept flow (updateRequestStatus in
-// requests.js) needs to flip a LISTING's status to "Matched" even though the
-// currently signed-in user is the buyer, not the listing's owner. Tightening
-// this to "only the owner, or only a status-field change" is possible but
-// needs a field-level rule (allow update: if resource.data.diff(...).changedKeys()
-// .hasOnly(['status'])) — left as a documented follow-up rather than shipped
-// here, to keep the prototype's rules easy to reason about in a 24h build.

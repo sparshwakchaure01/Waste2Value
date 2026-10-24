@@ -47,6 +47,8 @@ export const ADMIN_EMAILS = [
 
 Whoever signs in with that email sees the **Admin** link in the top nav (user list, platform stats, settings).
 
+The same list must also appear in the `isAdmin()` function in `firestore.rules` — the admin panel reads every request document, which the rules only allow for admins. Publish the rules after editing them (Firestore → Rules tab, or `firebase deploy --only firestore:rules`).
+
 ## 4. Install and run locally
 
 ```bash
