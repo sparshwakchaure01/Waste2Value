@@ -104,3 +104,13 @@ Firestore's free **Spark** plan has no server-side compute (Cloud Functions requ
 - **Mobile** — hamburger menu, collapsible filters, bottom-sheet modals, touch-sized controls (`styles/responsive.css`).
 
 After changing features that touch Firestore, republish `firestore.rules` (Firebase console → Firestore → Rules).
+
+## Feature round 3
+
+**Admin** — tabs for Overview (date-range stats, signup/listing trend charts), Users (verify / suspend / reactivate, search, CSV), Listings (hide, restore, delete), Deals & transport (filters, CSV), Activity log (`adminLog`) and Settings (platform announcement banner at `config/announcement`). Suspended users (`users/{uid}.disabled`) can't create listings, requests, transport requests or reviews; `verified` shows a badge on listings and profiles. Owners cannot set either flag themselves — the rules only let admins touch them.
+
+**Industry** — counter-offers (buyer offers price/quantity, seller counters, buyer accepts/declines; agreed terms feed the deal sheet), printable deal sheet (`#/deal/:id`), reviews after delivery (`reviews/{requestId_reviewer_reviewee}`, 1–5 stars, immutable), saved searches with new-match alerts (`savedSearches[]`), compare up to 3 listings, market price benchmark per resin, notification centre + bell, recurring supply reminders and Duplicate, CSV bulk upload (`#/bulk-upload`).
+
+**UI** — Ctrl/⌘+K command palette (also `/`), "needs your attention" strip, map-style route view with distance and an *indicative* freight estimate (the original brief excluded a cost estimator; this was added at the team's request and is labelled indicative), confetti / success states, first-run guided tour, accent colours + compact density (stored per browser), installable PWA (manifest, icons, service worker, offline indicator), top progress bar, animated landing.
+
+Rules must be republished after pulling this round (`firestore.rules`).

@@ -9,6 +9,8 @@ import { fetchUserDoc } from '../auth.js';
 import { renderRevealCard } from '../components/blindReveal.js';
 import { emptyState } from '../components/emptyState.js';
 import { routeLine, transportStepper } from '../components/route.js';
+import { routeMap } from '../components/routeMap.js';
+import { celebrate } from '../components/confetti.js';
 
 const pillFor = s => (s === 'pending' ? 'reserved' : s === 'declined' ? 'declined' : s === 'completed' ? 'neutral' : 'matched');
 
@@ -55,6 +57,7 @@ export async function renderLogistics(container) {
         el('span', { class: `pill pill-${pillFor(t.status)}` }, TRANSPORT_LABEL[t.status] || t.status)
       ]),
       routeLine(t.fromDistrict, t.toDistrict),
+      routeMap(t.fromDistrict, t.toDistrict, { kg: Number(t.quantity) * (t.unit === 'tonnes' ? 1000 : 1), compact: true }),
       meta,
       t.note ? el('p', { class: 'mt-16', style: 'font-style:italic;' }, `“${t.note}”`) : null
     ]);
@@ -101,7 +104,7 @@ export async function renderLogistics(container) {
       actions.push(btn);
     } else if (t.status === 'in_transit') {
       const btn = el('button', { class: 'btn btn-primary btn-sm' }, 'Mark delivered');
-      btn.addEventListener('click', run([btn], () => markDelivered(t), 'Delivered — deal completed.'));
+      btn.addEventListener('click', run([btn], () => markDelivered(t).then(() => celebrate('Delivered!', 'The deal is complete')), 'Delivered — deal completed.'));
       actions.push(btn);
     }
     if (actions.length) card.appendChild(el('div', { class: 'flex gap-12 mt-16 wrap' }, actions));

@@ -54,6 +54,12 @@ export async function signInWithGoogle(intent = 'signin') {
     return;
   }
 
+  if (userDoc?.disabled) {
+    await signOut(auth);
+    toast('This account has been suspended. Please contact the platform admin.', 'error');
+    return;
+  }
+
   setState({ firebaseUser: user, userDoc });
   if (userDoc) {
     toast(intent === 'signup' ? 'You already have an account — signed you in.' : 'Welcome back!', 'success');
@@ -104,6 +110,11 @@ export function listenAuthState(onReady) {
     } catch (err) {
       console.error('Could not load user profile', err);
       toast('Could not load your profile — check Firestore rules and connection.', 'error');
+    }
+    if (userDoc?.disabled) {
+      toast('This account has been suspended. Please contact the platform admin.', 'error');
+      await signOut(auth);
+      return;
     }
     setState({ firebaseUser: user, userDoc, loadingAuth: false });
     onReady();

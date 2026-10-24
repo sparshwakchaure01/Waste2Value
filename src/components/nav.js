@@ -4,6 +4,9 @@ import { signOutUser, isAdminEmail } from '../auth.js';
 import { navigate } from '../router.js';
 import { brandLockup } from './logo.js';
 import { getIncomingRequests } from '../services/requests.js';
+import { getInsights, buildNotifications, unreadCount } from '../services/insights.js';
+import { openPalette } from './palette.js';
+import { icon } from './logo.js';
 
 // Count of received requests waiting on the seller (pending or discussing).
 let badgeCount = 0;
@@ -33,6 +36,20 @@ export async function refreshNavBadge(force = false) {
 if (typeof document !== 'undefined' && !window.__w2vMenuClose) {
   window.__w2vMenuClose = true;
   document.addEventListener('click', () => document.querySelectorAll('.user-menu.open').forEach(m => m.classList.remove('open')));
+}
+
+// Unread notification count on the bell (and the drawer's Notifications link).
+let bellCount = 0;
+function paintBell() {
+  document.querySelectorAll('.bell-badge').forEach(b => { b.textContent = bellCount > 9 ? '9+' : String(bellCount); b.hidden = bellCount === 0; });
+}
+export async function refreshBell(force = false) {
+  if (!state.userDoc?.role || !state.firebaseUser) return;
+  try {
+    const events = buildNotifications(await getInsights(force));
+    bellCount = unreadCount(events, state.userDoc.notifSeenAt);
+  } catch { return; }
+  paintBell();
 }
 
 export function closeNav() {
@@ -86,6 +103,9 @@ export function renderNav() {
   }, avatarText);
   const userMenu = el('div', { class: 'user-menu-wrap' }, [avatarBtn, menu]);
 
+  const searchBtn = role ? el('button', { class: 'nav-search', onclick: () => openPalette(), 'aria-label': 'Search and commands' }, [icon('search', 15), el('span', { class: 'ns-label' }, 'Search'), el('kbd', {}, 'Ctrl K')]) : null;
+  const bell = role ? el('button', { class: `nav-bell ${currentHash === 'notifications' ? 'active' : ''}`, 'aria-label': 'Notifications', onclick: () => { closeNav(); navigate('notifications'); } }, [icon('bell', 19), el('span', { class: 'bell-badge', hidden: true }, '0')]) : null;
+
   const nav = el('nav', { class: 'topnav' }, [
     el('div', { class: 'topnav-inner' }, [
       el('div', {
@@ -94,6 +114,8 @@ export function renderNav() {
       }, brandLockup()),
       el('div', { class: 'nav-links' }, links.map(linkEl)),
       el('div', { class: 'nav-user' }, [
+        searchBtn,
+        bell,
         role ? el('span', { class: 'nav-role-badge' }, role) : null,
         userMenu,
         toggle
@@ -102,6 +124,7 @@ export function renderNav() {
     // Mobile drawer
     el('div', { class: 'nav-drawer' }, [
       ...links.map(linkEl),
+      role ? el('a', { class: `nav-link ${currentHash === 'notifications' ? 'active' : ''}`, onclick: () => { closeNav(); navigate('notifications'); } }, ['Notifications', el('span', { class: 'bell-badge', style: 'position:static;', hidden: true }, '0')]) : null,
       el('a', { class: `nav-link ${profileActive ? 'active' : ''}`, onclick: goProfile }, 'My Profile'),
       el('div', { class: 'nav-drawer-user' }, [
         el('div', { class: 'nav-avatar' }, avatarText),
@@ -111,6 +134,6 @@ export function renderNav() {
     ]),
     el('div', { class: 'nav-scrim', onclick: closeNav })
   ]);
-  queueMicrotask(() => { paintBadge(); refreshNavBadge(); });
+  queueMicrotask(() => { paintBadge(); paintBell(); refreshNavBadge(); refreshBell(); });
   return nav;
 }

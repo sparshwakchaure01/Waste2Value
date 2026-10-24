@@ -14,6 +14,12 @@ import { renderAdmin } from './pages/admin.js';
 import { renderAdminLogin } from './pages/adminLogin.js';
 import { renderMyListings } from './pages/myListings.js';
 import { renderProfile } from './pages/profile.js';
+import { renderNotifications } from './pages/notifications.js';
+import { renderDealSheet } from './pages/dealSheet.js';
+import { renderBulkUpload } from './pages/bulkUpload.js';
+import { startProgress, doneProgress } from './components/progress.js';
+import { renderBanner } from './components/banner.js';
+import { hideTray } from './components/compare.js';
 import { renderNav } from './components/nav.js';
 
 const routes = [
@@ -28,6 +34,9 @@ const routes = [
   { path: 'matches', auth: true, requiresRole: true, roles: ['industry'], render: renderMatches },
   { path: 'logistics', auth: true, requiresRole: true, roles: ['logistics'], render: renderLogistics },
   { path: 'profile', auth: true, render: renderProfile },
+  { path: 'notifications', auth: true, requiresRole: true, render: renderNotifications },
+  { path: 'deal/:id', auth: true, requiresRole: true, roles: ['industry'], render: renderDealSheet },
+  { path: 'bulk-upload', auth: true, requiresRole: true, roles: ['industry'], render: renderBulkUpload },
   { path: 'admin-login', auth: false, render: renderAdminLogin },
   { path: 'admin', auth: false, adminOnly: true, render: renderAdmin },
 ];
@@ -85,12 +94,14 @@ export function renderRoute() {
   if (route.adminOnly && !isAdminEmail(state.firebaseUser?.email)) { navigate(state.userDoc ? 'dashboard' : 'admin-login'); return; }
 
   app.innerHTML = '';
-  if (route.path !== '' && route.path !== 'admin-login') app.appendChild(renderNav());
+  if (route.path !== '' && route.path !== 'admin-login') { app.appendChild(renderNav()); app.appendChild(renderBanner()); }
+  if (route.path !== 'marketplace') hideTray();
   const body = document.createElement('div');
   body.className = route.path === '' ? 'page-body' : 'container page-body';
   app.appendChild(body);
+  startProgress();
   Promise.resolve(route.render(body, params)).catch(err => {
     console.error(err);
     body.innerHTML = `<div class="empty-state"><div class="ic">⚠️</div><h3>Something went wrong</h3><p>${err.code || err.message || 'Please try again.'}</p></div>`;
-  });
+  }).finally(doneProgress);
 }

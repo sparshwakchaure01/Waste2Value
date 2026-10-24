@@ -2,6 +2,9 @@ import { $ } from './utils.js';
 import { brandMarkSvg } from './components/logo.js';
 import { listenAuthState } from './auth.js';
 import { initRouter, renderRoute } from './router.js';
+import { applyTheme } from './theme.js';
+import { initPaletteHotkey } from './components/palette.js';
+import { registerServiceWorker, watchConnectivity } from './pwa.js';
 
 // Simple full-screen loader while Firebase resolves the auth session.
 function showLoading() {
@@ -21,6 +24,10 @@ if (pathRoute === '/admin' || pathRoute === '/admin-login') {
   window.history.replaceState(null, '', `/#${pathRoute}`);
 }
 
+applyTheme();
+initPaletteHotkey();
+registerServiceWorker();
+watchConnectivity();
 showLoading();
 
 let routerStarted = false;
