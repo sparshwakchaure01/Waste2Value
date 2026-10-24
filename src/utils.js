@@ -18,16 +18,39 @@ export function el(tag, attrs = {}, children = []) {
 
 const MAX_PHOTO_BYTES = 1024 * 1024; // 1MB hard limit, as specified
 
+// Base64 inflates size by ~33% and a Firestore document is capped at 1MiB, so after the
+// 1MB upload check the image is downscaled to a JPEG (max 1200px) before being stored.
+const MAX_PHOTO_DIMENSION = 1200;
+
 export function fileToBase64(file) {
   return new Promise((resolve, reject) => {
     if (!file) return resolve(null);
+    if (!file.type.startsWith('image/')) {
+      reject(new Error('Please choose an image file.'));
+      return;
+    }
     if (file.size > MAX_PHOTO_BYTES) {
       reject(new Error(`Image is ${(file.size / 1024 / 1024).toFixed(2)}MB — please upload a photo under 1MB.`));
       return;
     }
     const reader = new FileReader();
-    reader.onload = () => resolve(reader.result); // data:image/...;base64,xxxx
     reader.onerror = reject;
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('Could not read that image.'));
+      img.onload = () => {
+        const scale = Math.min(1, MAX_PHOTO_DIMENSION / Math.max(img.width, img.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/jpeg', 0.8)); // data:image/jpeg;base64,xxxx
+      };
+      img.src = reader.result;
+    };
     reader.readAsDataURL(file);
   });
 }
