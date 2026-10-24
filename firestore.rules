@@ -32,6 +32,11 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/users/$(uid)).data;
     }
 
+    // A suspended user (users/{uid}.disabled == true, set by an admin) can't create anything.
+    function isActive() {
+      return !userData(request.auth.uid).get('disabled', false);
+    }
+
     function isLogistics() {
       return isSignedIn() && userData(request.auth.uid).role == 'logistics';
     }
@@ -41,8 +46,14 @@ service cloud.firestore {
     // A user can only create/update their own doc, and can't change their role.
     match /users/{userId} {
       allow read: if isSignedIn();
-      allow create: if isOwner(userId) && request.resource.data.role in ['industry', 'logistics'];
-      allow update: if isOwner(userId) && request.resource.data.role == resource.data.role;
+      allow create: if isOwner(userId) && request.resource.data.role in ['industry', 'logistics']
+        && !('verified' in request.resource.data) && !('disabled' in request.resource.data);
+      allow update: if
+        (isOwner(userId) && request.resource.data.role == resource.data.role
+          && request.resource.data.get('verified', false) == resource.data.get('verified', false)
+          && request.resource.data.get('disabled', false) == resource.data.get('disabled', false))
+        ||
+        (isAdmin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['verified', 'disabled']));
       allow delete: if false;
     }
 
@@ -50,10 +61,13 @@ service cloud.firestore {
     // create, update (incl. flipping status to "Matched" on accept) or delete.
     match /listings/{listingId} {
       allow read: if isSignedIn();
-      allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid;
-      allow update: if isSignedIn() && resource.data.ownerId == request.auth.uid
-        && request.resource.data.ownerId == resource.data.ownerId;
-      allow delete: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid && isActive();
+      allow update: if isSignedIn() && (
+        (resource.data.ownerId == request.auth.uid && request.resource.data.ownerId == resource.data.ownerId && isActive()) ||
+        // admin moderation: change status only
+        (isAdmin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']))
+      );
+      allow delete: if isSignedIn() && (resource.data.ownerId == request.auth.uid || isAdmin());
     }
 
     // Requests (deals): readable only by the buyer, the seller, or admins.
@@ -68,15 +82,24 @@ service cloud.firestore {
         resource.data.sellerId == request.auth.uid ||
         isAdmin()
       );
-      allow create: if isSignedIn()
+      allow create: if isSignedIn() && isActive()
         && request.resource.data.buyerId == request.auth.uid
         && request.resource.data.status == 'pending'
         && request.resource.data.sellerId ==
            get(/databases/$(database)/documents/listings/$(request.resource.data.listingId)).data.ownerId;
       allow update: if isSignedIn() && (
-        // seller decides on the request
+        // seller decides on the request, or sends a counter-offer
         (resource.data.sellerId == request.auth.uid
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']))
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt', 'counter']))
+        ||
+        // buyer accepts / declines an open counter-offer (terms themselves can't change)
+        (resource.data.buyerId == request.auth.uid
+          && 'counter' in resource.data
+          && resource.data.counter.status == 'open'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['counter', 'updatedAt'])
+          && request.resource.data.counter.status in ['accepted', 'declined']
+          && request.resource.data.counter.price == resource.data.counter.price
+          && request.resource.data.counter.qty == resource.data.counter.qty)
         ||
         // partner who was asked takes the job (only while the deal has no partner yet)
         (isLogistics()
@@ -107,7 +130,7 @@ service cloud.firestore {
         resource.data.buyerId == request.auth.uid ||
         isAdmin()
       );
-      allow create: if isSignedIn()
+      allow create: if isSignedIn() && isActive()
         && request.resource.data.requesterId == request.auth.uid
         && request.resource.data.status == 'pending'
         && (request.resource.data.sellerId == request.auth.uid || request.resource.data.buyerId == request.auth.uid)
@@ -134,6 +157,39 @@ service cloud.firestore {
           (resource.data.status == 'in_transit' && request.resource.data.status == 'completed')
         );
       allow delete: if false;
+    }
+
+    // Reviews: written once by a party of a DELIVERED deal about the other party or the transport
+    // partner. Doc id = requestId_reviewerId_revieweeId. Anyone signed in can read (reputation).
+    match /reviews/{reviewId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isActive()
+        && request.resource.data.reviewerId == request.auth.uid
+        && reviewId == request.resource.data.requestId + '_' + request.auth.uid + '_' + request.resource.data.revieweeId
+        && request.resource.data.rating is int && request.resource.data.rating >= 1 && request.resource.data.rating <= 5
+        && get(/databases/$(database)/documents/requests/$(request.resource.data.requestId)).data.status == 'completed'
+        && (get(/databases/$(database)/documents/requests/$(request.resource.data.requestId)).data.sellerId == request.auth.uid
+            || get(/databases/$(database)/documents/requests/$(request.resource.data.requestId)).data.buyerId == request.auth.uid)
+        && request.resource.data.revieweeId != request.auth.uid
+        && request.resource.data.revieweeId in [
+          get(/databases/$(database)/documents/requests/$(request.resource.data.requestId)).data.sellerId,
+          get(/databases/$(database)/documents/requests/$(request.resource.data.requestId)).data.buyerId,
+          get(/databases/$(database)/documents/requests/$(request.resource.data.requestId)).data.get('logisticsId', '')
+        ];
+      allow update, delete: if false;
+    }
+
+    // Platform announcement banner (config/announcement) — everyone reads, admins write.
+    match /config/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // Admin action log — admins only.
+    match /adminLog/{logId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin() && request.resource.data.adminEmail == request.auth.token.email;
+      allow update, delete: if false;
     }
   }
 }
