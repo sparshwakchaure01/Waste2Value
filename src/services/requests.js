@@ -67,3 +67,16 @@ export async function getAcceptedDealsForDistricts(districts) {
   const all = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort(newestFirst);
   return all.filter(r => districts.includes(r.district));
 }
+
+export async function getCompletedDealsForDistricts(districts) {
+  if (!districts || !districts.length) return [];
+  const q = query(collection(db, COL), where('status', '==', 'completed'));
+  const snap = await getDocs(q);
+  return snap.docs.map(d => ({ id: d.id, ...d.data() })).sort(newestFirst)
+    .filter(r => districts.includes(r.district));
+}
+
+// Logistics operator confirms the material has been collected.
+export async function markPickedUp(requestId) {
+  await updateDoc(doc(db, COL, requestId), { status: 'completed', updatedAt: serverTimestamp() });
+}

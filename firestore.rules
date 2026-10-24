@@ -67,7 +67,8 @@ service cloud.firestore {
     // Requests: readable by the buyer or seller involved; logistics operators
     // can read accepted/completed deals; admins can read all (analytics).
     // A buyer creates a 'pending' request against a listing's real owner.
-    // Only the seller can change status — the buyer cannot self-accept.
+    // Only the seller can change status — the buyer cannot self-accept — plus a
+    // logistics operator may mark an accepted deal in their districts as picked up.
     match /requests/{requestId} {
       allow read: if isSignedIn() && (
         resource.data.buyerId == request.auth.uid ||
@@ -80,8 +81,16 @@ service cloud.firestore {
         && request.resource.data.status == 'pending'
         && request.resource.data.sellerId ==
            get(/databases/$(database)/documents/listings/$(request.resource.data.listingId)).data.ownerId;
-      allow update: if isSignedIn() && resource.data.sellerId == request.auth.uid
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']);
+      allow update: if isSignedIn()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
+        && (
+          resource.data.sellerId == request.auth.uid ||
+          // logistics operator confirming pickup of an accepted deal in their own districts
+          (isLogistics()
+            && resource.data.status == 'accepted'
+            && request.resource.data.status == 'completed'
+            && resource.data.district in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.districts)
+        );
       allow delete: if false;
     }
   }

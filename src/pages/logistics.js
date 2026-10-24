@@ -1,7 +1,7 @@
-import { el, toast, timeAgo } from '../utils.js';
+import { el, toast, timeAgo, skeletonRows } from '../utils.js';
 import { state, setState } from '../state.js';
 import { saveLogisticsProfile } from '../services/logistics.js';
-import { getAcceptedDealsForDistricts } from '../services/requests.js';
+import { getAcceptedDealsForDistricts, getCompletedDealsForDistricts, markPickedUp } from '../services/requests.js';
 import { fetchUserDoc } from '../auth.js';
 import { MAHARASHTRA_DISTRICTS } from '../data/districts.js';
 
@@ -72,22 +72,62 @@ export async function renderLogistics(container) {
   container.appendChild(el('h3', { class: 'mt-16' }, 'Deals ready for pickup'));
   const dealsWrap = el('div', {});
   container.appendChild(dealsWrap);
+  container.appendChild(el('h3', { class: 'mt-24' }, 'Completed pickups'));
+  const doneWrap = el('div', {});
+  container.appendChild(doneWrap);
 
-  const deals = await getAcceptedDealsForDistricts(Array.from(selected));
-  if (!deals.length) {
-    dealsWrap.appendChild(el('div', { class: 'empty-state' }, [
-      el('div', { class: 'ic' }, '🚚'),
-      el('p', {}, 'No accepted deals in your districts yet.')
-    ]));
-  } else {
-    deals.forEach(d => {
-      dealsWrap.appendChild(el('div', { class: 'request-card' }, [
-        el('div', { class: 'flex-between' }, [
-          el('strong', {}, `${d.category} · ${d.quantity} ${d.unit}`),
-          el('span', { class: 'pill pill-matched' }, d.status)
-        ]),
-        el('div', { class: 'text-faint' }, `${d.district} · accepted ${timeAgo(d.updatedAt || d.createdAt)}`)
-      ]));
-    });
+  function emptyState(text) {
+    return el('div', { class: 'empty-state' }, [el('div', { class: 'ic' }, '🚚'), el('p', {}, text)]);
   }
+
+  function openDealCard(d) {
+    const btn = el('button', { class: 'btn btn-primary btn-sm' }, 'Mark picked up');
+    btn.addEventListener('click', async () => {
+      btn.disabled = true; btn.textContent = 'Saving…';
+      try {
+        await markPickedUp(d.id);
+        toast('Marked as picked up.', 'success');
+        drawDeals();
+      } catch (err) {
+        console.error(err);
+        toast('Could not update — save your service area first, then try again.', 'error');
+        btn.disabled = false; btn.textContent = 'Mark picked up';
+      }
+    });
+    return el('div', { class: 'request-card' }, [
+      el('div', { class: 'flex-between' }, [
+        el('strong', {}, `${d.category} · ${d.quantity} ${d.unit}`),
+        el('span', { class: 'pill pill-matched' }, d.status)
+      ]),
+      el('div', { class: 'text-faint' }, `${d.district} · accepted ${timeAgo(d.updatedAt || d.createdAt)}`),
+      el('div', { class: 'mt-16' }, btn)
+    ]);
+  }
+
+  function doneDealCard(d) {
+    return el('div', { class: 'request-card' }, [
+      el('div', { class: 'flex-between' }, [
+        el('strong', {}, `${d.category} · ${d.quantity} ${d.unit}`),
+        el('span', { class: 'pill pill-neutral' }, 'picked up')
+      ]),
+      el('div', { class: 'text-faint' }, `${d.district} · ${timeAgo(d.updatedAt || d.createdAt)}`)
+    ]);
+  }
+
+  async function drawDeals() {
+    dealsWrap.replaceChildren(skeletonRows(2));
+    const districts = Array.from(selected);
+    try {
+      const [open, done] = await Promise.all([
+        getAcceptedDealsForDistricts(districts), getCompletedDealsForDistricts(districts)
+      ]);
+      dealsWrap.replaceChildren(...(open.length ? open.map(openDealCard) : [emptyState('No accepted deals in your districts yet.')]));
+      doneWrap.replaceChildren(...(done.length ? done.map(doneDealCard) : [emptyState('Nothing picked up yet.')]));
+    } catch (err) {
+      console.error(err);
+      dealsWrap.replaceChildren(emptyState('Could not load deals.'));
+    }
+  }
+
+  await drawDeals();
 }
