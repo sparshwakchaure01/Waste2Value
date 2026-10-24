@@ -1,14 +1,13 @@
 import { el, initials } from '../utils.js';
 import { state } from '../state.js';
-import { signOutUser } from '../auth.js';
+import { signOutUser, isAdminEmail } from '../auth.js';
 import { navigate } from '../router.js';
-import { ADMIN_EMAILS } from '../data/categories.js';
 import { brandLockup } from './logo.js';
 
 export function renderNav() {
   const currentHash = window.location.hash.replace(/^#\/?/, '').split('/')[0];
   const role = state.userDoc?.role;
-  const isAdmin = ADMIN_EMAILS.includes(state.firebaseUser?.email);
+  const isAdmin = isAdminEmail(state.firebaseUser?.email);
 
   const links = [];
   if (role === 'industry') {
@@ -29,7 +28,7 @@ export function renderNav() {
     el('div', { class: 'topnav-inner' }, [
       el('div', {
         class: 'brand',
-        onclick: () => navigate(role ? 'dashboard' : '')
+        onclick: () => navigate(role ? 'dashboard' : isAdmin ? 'admin' : '')
       }, brandLockup()),
       el('div', { class: 'nav-links' },
         links.map(l => el('a', {

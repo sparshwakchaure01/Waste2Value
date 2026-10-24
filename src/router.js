@@ -1,6 +1,6 @@
 import { $ } from './utils.js';
 import { state } from './state.js';
-import { ADMIN_EMAILS } from './data/categories.js';
+import { isAdminEmail } from './auth.js';
 
 import { renderLanding } from './pages/landing.js';
 import { renderOnboarding } from './pages/onboarding.js';
@@ -11,6 +11,7 @@ import { renderCreateListing } from './pages/createListing.js';
 import { renderMatches } from './pages/matches.js';
 import { renderLogistics } from './pages/logistics.js';
 import { renderAdmin } from './pages/admin.js';
+import { renderAdminLogin } from './pages/adminLogin.js';
 import { renderNav } from './components/nav.js';
 
 const routes = [
@@ -22,7 +23,8 @@ const routes = [
   { path: 'create-listing', auth: true, requiresRole: true, roles: ['industry'], render: renderCreateListing },
   { path: 'matches', auth: true, requiresRole: true, roles: ['industry'], render: renderMatches },
   { path: 'logistics', auth: true, requiresRole: true, roles: ['logistics'], render: renderLogistics },
-  { path: 'admin', auth: true, requiresRole: true, adminOnly: true, render: renderAdmin },
+  { path: 'admin-login', auth: false, render: renderAdminLogin },
+  { path: 'admin', auth: false, adminOnly: true, render: renderAdmin },
 ];
 
 function matchRoute(hash) {
@@ -68,16 +70,17 @@ export function renderRoute() {
   const { route, params } = matched;
 
   // Auth gating
+  if (route.adminOnly && !state.firebaseUser) { navigate('admin-login'); return; }
   if (route.auth && !state.firebaseUser) { navigate(''); return; }
   if (route.requiresRole && state.firebaseUser && !state.userDoc) { navigate('onboarding'); return; }
   if (route.path === 'onboarding' && state.userDoc) { navigate('dashboard'); return; }
   if (route.path === '' && state.firebaseUser && state.userDoc) { navigate('dashboard'); return; }
 
   if (route.roles && state.userDoc && !route.roles.includes(state.userDoc.role)) { navigate('dashboard'); return; }
-  if (route.adminOnly && !ADMIN_EMAILS.includes(state.firebaseUser?.email)) { navigate('dashboard'); return; }
+  if (route.adminOnly && !isAdminEmail(state.firebaseUser?.email)) { navigate(state.userDoc ? 'dashboard' : 'admin-login'); return; }
 
   app.innerHTML = '';
-  if (route.path !== '') app.appendChild(renderNav());
+  if (route.path !== '' && route.path !== 'admin-login') app.appendChild(renderNav());
   const body = document.createElement('div');
   body.className = route.path === '' ? 'page-body' : 'container page-body';
   app.appendChild(body);

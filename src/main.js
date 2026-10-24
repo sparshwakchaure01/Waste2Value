@@ -15,6 +15,12 @@ function showLoading() {
     </div>`;
 }
 
+// Allow /admin and /admin-login as plain paths (e.g. typed into the address bar).
+const pathRoute = window.location.pathname.replace(/\/+$/, '');
+if (pathRoute === '/admin' || pathRoute === '/admin-login') {
+  window.history.replaceState(null, '', `/#${pathRoute}`);
+}
+
 showLoading();
 
 let routerStarted = false;

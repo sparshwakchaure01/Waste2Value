@@ -14,7 +14,10 @@ export function renderLanding(container) {
     el('nav', { class: 'topnav' }, [
       el('div', { class: 'topnav-inner' }, [
         el('div', { class: 'brand' }, brandLockup()),
-        el('button', { class: 'btn btn-google btn-sm', onclick: signInWithGoogle }, 'Continue with Google')
+        el('div', { class: 'flex gap-8' }, [
+          el('button', { class: 'btn btn-ghost-light btn-sm', onclick: () => signInWithGoogle('signin') }, 'Sign in'),
+          el('button', { class: 'btn btn-google btn-sm', onclick: () => signInWithGoogle('signup') }, 'Create account')
+        ])
       ])
     ])
   );
@@ -24,7 +27,8 @@ export function renderLanding(container) {
     el('h1', {}, ['One factory’s plastic waste, ', el('em', {}, 'another’s raw material.')]),
     el('p', {}, 'List scrap plastic, get matched with buyers nearby, and connect only once both sides agree — identities stay private until then.'),
     el('div', { class: 'hero-actions' }, [
-      el('button', { class: 'btn btn-primary', onclick: signInWithGoogle }, 'Get started with Google'),
+      el('button', { class: 'btn btn-primary', onclick: () => signInWithGoogle('signup') }, 'Create account with Google'),
+      el('button', { class: 'btn btn-outline', onclick: () => signInWithGoogle('signin') }, 'Sign in'),
     ]),
     el('div', { class: 'trust-strip' }, [
       el('div', {}, [el('strong', {}, '9'), el('span', {}, 'resin categories')]),
@@ -60,13 +64,13 @@ export function renderLanding(container) {
         el('p', {}, 'Declare your districts and vehicle, and pick up accepted deals.')
       ])
     ]),
-    el('p', { class: 'text-faint landing-note' }, 'Sign in with Google — you’ll choose your role next.')
+    el('p', { class: 'text-faint landing-note' }, 'New here? Create an account with Google and pick your role. Already registered? Just sign in.')
   ]));
 
   container.appendChild(el('footer', { class: 'site-footer' }, [
     el('div', { class: 'container' }, [
       el('span', { class: 'brand-word' }, ['Waste', el('span', { class: 'brand-two' }, '2'), 'Value']),
-      el('span', {}, 'Industrial by-product exchange · Team SYNC · Pragyan 2K26')
+      el('span', {}, ['Industrial by-product exchange · Team SYNC · Pragyan 2K26 · ', el('a', { href: '#/admin-login', class: 'footer-link' }, 'Admin')])
     ])
   ]));
 }

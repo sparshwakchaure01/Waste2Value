@@ -1,6 +1,7 @@
 import { el, initials, formatDate } from '../utils.js';
 import { getAllUsers, getPlatformStats } from '../services/admin.js';
 import { ADMIN_EMAILS } from '../data/categories.js';
+import { isAdminEmail } from '../auth.js';
 import { state } from '../state.js';
 
 export async function renderAdmin(container) {
@@ -57,7 +58,7 @@ export async function renderAdmin(container) {
       el('code', {}, 'ADMIN_EMAILS'),
       '.'
     ]),
-    el('p', { class: 'text-faint mt-8' }, `Signed in as: ${state.firebaseUser?.email} ${ADMIN_EMAILS.includes(state.firebaseUser?.email) ? '(admin)' : ''}`)
+    el('p', { class: 'text-faint mt-8' }, `Signed in as: ${state.firebaseUser?.email} ${isAdminEmail(state.firebaseUser?.email) ? '(admin)' : ''}`)
   ]));
 }
 

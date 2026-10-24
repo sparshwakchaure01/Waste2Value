@@ -12,9 +12,9 @@ export function renderOnboarding(container) {
     container.innerHTML = '';
     const wrap = el('div', { class: 'container', style: 'max-width:640px;padding-top:60px;' });
 
-    wrap.appendChild(el('div', { class: 'hero-eyebrow' }, 'One last step'));
+    wrap.appendChild(el('div', { class: 'hero-eyebrow' }, 'Create your account'));
     wrap.appendChild(el('h1', { style: 'font-size:28px;' }, `Welcome, ${state.firebaseUser?.displayName?.split(' ')[0] || 'there'}.`));
-    wrap.appendChild(el('p', {}, 'Tell us how you’ll use Waste2Value.'));
+    wrap.appendChild(el('p', {}, 'Choose how you’ll use Waste2Value. You’ll sign in with the same Google account next time.'));
 
     if (!selectedRole) {
       const grid = el('div', { class: 'role-pick-grid', style: 'margin-top:28px;' }, [
