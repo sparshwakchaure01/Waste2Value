@@ -3,6 +3,32 @@ import { state } from '../state.js';
 import { signOutUser, isAdminEmail } from '../auth.js';
 import { navigate } from '../router.js';
 import { brandLockup } from './logo.js';
+import { getIncomingRequests } from '../services/requests.js';
+
+// Count of received requests waiting on the seller (pending or discussing).
+let badgeCount = 0;
+let badgeAt = 0;
+
+function paintBadge() {
+  document.querySelectorAll('.nav-badge').forEach(b => {
+    b.textContent = String(badgeCount);
+    b.hidden = badgeCount === 0;
+  });
+}
+
+export async function refreshNavBadge(force = false) {
+  if (state.userDoc?.role !== 'industry' || !state.firebaseUser) return;
+  if (force || Date.now() - badgeAt > 15000) {
+    try {
+      const incoming = await getIncomingRequests(state.firebaseUser.uid);
+      badgeCount = incoming.filter(r => r.status === 'pending' || r.status === 'discussing').length;
+      badgeAt = Date.now();
+    } catch {
+      return;
+    }
+  }
+  paintBadge();
+}
 
 export function renderNav() {
   const currentHash = window.location.hash.replace(/^#\/?/, '').split('/')[0];
@@ -14,7 +40,7 @@ export function renderNav() {
     links.push(
       { path: 'dashboard', label: 'Dashboard' },
       { path: 'marketplace', label: 'Marketplace' },
-      { path: 'matches', label: 'My Matches' },
+      { path: 'matches', label: 'My Matches', badge: true },
     );
   } else if (role === 'logistics') {
     links.push(
@@ -34,7 +60,7 @@ export function renderNav() {
         links.map(l => el('a', {
           class: `nav-link ${currentHash === l.path ? 'active' : ''}`,
           onclick: () => navigate(l.path)
-        }, l.label))
+        }, [l.label, l.badge ? el('span', { class: 'nav-badge', hidden: true }, '0') : null]))
       ),
       el('div', { class: 'nav-user' }, [
         role ? el('span', { class: 'nav-role-badge' }, role) : null,
@@ -43,5 +69,6 @@ export function renderNav() {
       ])
     ])
   ]);
+  queueMicrotask(() => { paintBadge(); refreshNavBadge(); });
   return nav;
 }
