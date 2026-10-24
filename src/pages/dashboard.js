@@ -7,6 +7,24 @@ import { getIncomingTransports } from '../services/transports.js';
 import { barChart } from '../components/charts.js';
 import { emptyState } from '../components/emptyState.js';
 import { icon } from '../components/logo.js';
+import { getInsights, buildAttention } from '../services/insights.js';
+import { startTour } from '../components/tour.js';
+
+// "Needs your attention" — actionable items pulled from deals, transport, saved searches and profile.
+async function fillAttention(host) {
+  let items;
+  try { items = buildAttention(await getInsights()); } catch { return; }
+  if (!items.length) {
+    host.replaceChildren(el('div', { class: 'attn-clear' }, [icon('check', 20), 'You’re all caught up — nothing needs your attention.']));
+    return;
+  }
+  host.replaceChildren(el('div', { class: 'attention' }, items.map((it, i) => el('button', {
+    class: `attn ${it.tone}`, style: `animation-delay:${i * 60}ms`, onclick: () => navigate(it.path)
+  }, [icon(it.icon, 20), el('div', {}, [
+    el('b', {}, it.pct ? `${it.count}%` : String(it.count)),
+    el('span', { class: 't' }, it.pct ? it.title.replace(/^% /, '') : it.title)
+  ])]))));
+}
 
 export async function renderDashboard(container) {
   const role = state.userDoc.role;
@@ -17,6 +35,10 @@ export async function renderDashboard(container) {
     ])
   ]));
 
+  const attention = el('div', {});
+  container.appendChild(attention);
+  fillAttention(attention);
+
   try {
     if (role === 'industry') await renderIndustryDashboard(container);
     else await renderLogisticsDashboardHome(container);
@@ -24,6 +46,7 @@ export async function renderDashboard(container) {
     console.error(err);
     container.appendChild(emptyState('search', 'Could not load your dashboard — check your connection and Firestore rules.'));
   }
+  setTimeout(() => startTour(), 900);
 }
 
 function quickAction(iconName, label, path, primary = false) {

@@ -7,6 +7,12 @@ import { getUserListings, totalKg } from '../services/listings.js';
 import { getIncomingRequests, getOutgoingRequests } from '../services/requests.js';
 import { getIncomingTransports } from '../services/transports.js';
 import { districtPicker } from '../components/districtPicker.js';
+import { ACCENTS, getTheme, setTheme } from '../theme.js';
+import { canInstall, installApp } from '../pwa.js';
+import { getRatingSummary } from '../services/reviews.js';
+import { stars } from '../components/reviews.js';
+import { startTour } from '../components/tour.js';
+import { icon } from '../components/logo.js';
 import { MAHARASHTRA_DISTRICTS } from '../data/districts.js';
 
 const VEHICLE_TYPES = ['Mini Truck (Tata Ace / similar)', 'Pickup', 'Truck (6-10 tonne)', 'Trailer (10+ tonne)', 'Tempo / Van'];
@@ -148,7 +154,37 @@ export async function renderProfile(container) {
     ])
   ]));
 
+  // ---------- appearance + app ----------
+  const theme = getTheme();
+  const swatches = el('div', { class: 'swatches' }, Object.entries(ACCENTS).map(([key, a]) => el('button', {
+    class: `swatch ${theme.accent === key ? 'active' : ''}`, title: a.label, 'aria-label': a.label,
+    style: `background:linear-gradient(135deg, ${a.bright}, ${a.teal});`,
+    onclick: () => { setTheme({ accent: key }); swatches.querySelectorAll('.swatch').forEach(s => s.classList.toggle('active', s.title === a.label)); }
+  })));
+  const compact = el('input', { type: 'checkbox', checked: theme.compact ? true : false });
+  compact.addEventListener('change', () => setTheme({ compact: compact.checked }));
+  const installBtn = el('button', { class: 'btn btn-outline btn-sm', style: canInstall() ? '' : 'display:none;', onclick: async () => { await installApp(); } }, [icon('download', 14), 'Install app']);
+  window.addEventListener('w2v-installable', () => { installBtn.style.display = ''; }, { once: true });
+  side.appendChild(el('div', { class: 'card' }, [
+    el('h3', {}, 'Appearance & app'),
+    el('div', { class: 'field mt-16' }, [el('label', {}, 'Accent colour'), swatches]),
+    el('label', { class: 'switch-row' }, [compact, el('span', {}, [el('strong', {}, 'Compact density'), el('span', { class: 'text-faint' }, ' — tighter spacing')])]),
+    el('div', { class: 'flex gap-8 wrap mt-16' }, [
+      el('button', { class: 'btn btn-outline btn-sm', onclick: () => startTour(true) }, [icon('spark', 14), 'Replay tour']),
+      installBtn
+    ]),
+    el('p', { class: 'text-faint mt-8' }, 'Tip: press Ctrl K anywhere to search and jump around.')
+  ]));
+
   container.appendChild(el('div', { class: 'profile-grid mt-16' }, [form, side]));
+
+  // reputation + verified badge (async, non-blocking)
+  getRatingSummary(user.uid).then(s => {
+    const chips = container.querySelector('.profile-hero .meta-chips');
+    if (!chips) return;
+    if (profile.verified) chips.prepend(el('span', { class: 'pill pill-verified' }, '✓ verified'));
+    chips.appendChild(stars(s.avg, { count: s.count }));
+  }).catch(() => {});
 
   // ---------- save ----------
   saveBtn.addEventListener('click', async () => {

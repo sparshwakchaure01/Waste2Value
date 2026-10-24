@@ -8,13 +8,14 @@ const COL = 'requests';
 
 // status: 'pending' -> 'declined' | 'discussing' -> 'accepted' | 'declined' -> (logistics) 'completed'
 
-export async function sendRequest({ listing, buyerId, message, offeredQty = null }) {
+export async function sendRequest({ listing, buyerId, message, offeredQty = null, offerPrice = null }) {
   const ref = await addDoc(collection(db, COL), {
     listingId: listing.id,
     sellerId: listing.ownerId,
     buyerId,
     message,
     offeredQty: offeredQty ? Number(offeredQty) : null,
+    offerPrice: offerPrice ? Number(offerPrice) : null,
     status: 'pending',
     // denormalized snapshot so the logistics dashboard & lists don't need extra reads
     category: listing.category,
@@ -57,4 +58,29 @@ export function revealLevel(status) {
   if (status === 'accepted' || status === 'completed') return 'full';   // name, phone, email, address
   if (status === 'discussing') return 'phone';                          // phone only, per the Discuss flow
   return 'none';
+}
+
+// ---- counter-offers: the seller proposes price/quantity; the buyer accepts or declines ----
+export async function sendCounter(requestId, { price, qty, note }) {
+  await updateDoc(doc(db, COL, requestId), {
+    counter: { price: Number(price), qty: Number(qty), note: (note || '').slice(0, 200), status: 'open', by: 'seller', at: Date.now() },
+    updatedAt: serverTimestamp()
+  });
+}
+
+export async function respondCounter(requestId, counter, accept) {
+  await updateDoc(doc(db, COL, requestId), {
+    counter: { ...counter, status: accept ? 'accepted' : 'declined', respondedAt: Date.now() },
+    updatedAt: serverTimestamp()
+  });
+}
+
+// The terms both sides are working to: an accepted counter wins, then the buyer's offer, then the listing.
+export function dealTerms(r) {
+  if (r.counter && r.counter.status === 'accepted') return { price: r.counter.price, qty: r.counter.qty, source: 'counter-offer' };
+  return {
+    price: r.offerPrice ?? r.costPerKg,
+    qty: r.offeredQty ?? r.quantity,
+    source: r.offerPrice || r.offeredQty ? 'buyer offer' : 'listing'
+  };
 }

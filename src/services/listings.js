@@ -20,6 +20,7 @@ export async function createListing(ownerId, data) {
     photos: data.photos || [],
     photoBase64: (data.photos && data.photos[0]) || null,
     district: data.district,
+    recurrence: data.recurrence || 'none',
     createdAt: serverTimestamp()
   });
   return ref.id;
@@ -74,7 +75,8 @@ export const SORT_OPTIONS = [
   ['newest', 'Newest first'],
   ['price-asc', 'Price: low to high'],
   ['price-desc', 'Price: high to low'],
-  ['qty-desc', 'Quantity: high to low']
+  ['qty-desc', 'Quantity: high to low'],
+  ['distance', 'Nearest to me']
 ];
 
 const inKg = l => Number(l.quantity) * (l.unit === 'tonnes' ? 1000 : 1);
@@ -106,6 +108,7 @@ export async function updateListing(id, data) {
     photos: data.photos || [],
     photoBase64: (data.photos && data.photos[0]) || null,
     district: data.district,
+    recurrence: data.recurrence || 'none',
     ...(data.status ? { status: data.status } : {})
   });
 }

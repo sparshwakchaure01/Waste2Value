@@ -5,6 +5,8 @@ import { createListing, updateListing, getListingById, listingPhotos } from '../
 import { PLASTIC_CATEGORIES, GRADES, FREQUENCIES, UNITS } from '../data/categories.js';
 import { MAHARASHTRA_DISTRICTS } from '../data/districts.js';
 import { emptyState } from '../components/emptyState.js';
+import { getMarketStats, priceVerdict } from '../services/benchmarks.js';
+import { celebrate } from '../components/confetti.js';
 
 const MAX_PHOTOS = 4;
 const MAX_TOTAL_CHARS = 850000; // keeps the whole Firestore document under its 1MiB limit
@@ -89,6 +91,22 @@ function buildForm(container, existing) {
 
   const input = (id, type, value, extra = {}) => el('input', { type, id, value: value ?? '', ...extra });
 
+  const recurrenceSelect = el('select', { id: 'f-recurrence' },
+    [['none', 'One listing (no repeat)'], ['weekly', 'Repeats weekly'], ['monthly', 'Repeats monthly']].map(([v, l]) => opt(v, l, (existing?.recurrence || 'none') === v)));
+  const costHint = el('div', { class: 'field-hint' }, '');
+
+  async function updateHint() {
+    const cat = categorySelect.value;
+    if (!cat) { costHint.textContent = ''; return; }
+    try {
+      const s = (await getMarketStats())[cat];
+      if (!s || s.count < 2) { costHint.textContent = `Not enough ${cat} listings yet for a market price.`; return; }
+      const price = Number(form.querySelector('#f-cost')?.value);
+      const v = priceVerdict(price, s);
+      costHint.textContent = `Market for ${cat}: avg ₹${s.avg.toFixed(0)} (range ₹${s.min.toFixed(0)}–₹${s.max.toFixed(0)}, ${s.count} listings)${v ? ` — yours is ${v.label.toLowerCase()}` : ''}.`;
+    } catch { costHint.textContent = ''; }
+  }
+
   const form = el('form', { class: 'card form-card' }, [
     el('div', { class: 'field' }, [el('label', {}, `Photos (up to ${MAX_PHOTOS}, each under 1MB)`), photoInput, photoGrid]),
     el('div', { class: 'field' }, [el('label', {}, 'Category of Plastic'), categorySelect]),
@@ -98,10 +116,11 @@ function buildForm(container, existing) {
       el('div', { class: 'field' }, [el('label', {}, 'Unit'), unitSelect]),
     ]),
     el('div', { class: 'field-row' }, [
-      el('div', { class: 'field' }, [el('label', {}, 'Cost (₹ per kg, indicative)'), input('f-cost', 'number', existing?.costPerKg, { min: '0', step: 'any', required: true, placeholder: 'e.g. 18' })]),
+      el('div', { class: 'field' }, [el('label', {}, 'Cost (₹ per kg, indicative)'), input('f-cost', 'number', existing?.costPerKg, { min: '0', step: 'any', required: true, placeholder: 'e.g. 18' }), costHint]),
       el('div', { class: 'field' }, [el('label', {}, 'Availability'), frequencySelect]),
     ]),
     el('div', { class: 'field' }, [el('label', {}, 'Quantity per cycle (optional)'), input('f-freqqty', 'number', existing?.frequencyQty, { min: '0', step: 'any', placeholder: 'e.g. 500 kg/week' })]),
+    el('div', { class: 'field' }, [el('label', {}, 'Recurring supply'), recurrenceSelect, el('div', { class: 'field-hint' }, 'We’ll remind you to re-list when a recurring lot sells.')]),
     el('div', { class: 'field' }, [el('label', {}, 'District'), districtSelect]),
     statusSelect ? el('div', { class: 'field' }, [
       el('label', {}, 'Listing status'), statusSelect,
@@ -115,6 +134,9 @@ function buildForm(container, existing) {
   ]);
 
   form.querySelector('textarea').value = existing?.description || '';
+  categorySelect.addEventListener('change', updateHint);
+  form.querySelector('#f-cost').addEventListener('input', updateHint);
+  updateHint();
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -138,7 +160,7 @@ function buildForm(container, existing) {
       costPerKg, availabilityFrequency: frequencySelect.value,
       frequencyQty: form.querySelector('#f-freqqty').value,
       description: form.querySelector('#f-description').value,
-      photos, district
+      photos, district, recurrence: recurrenceSelect.value
     };
 
     try {
@@ -149,7 +171,7 @@ function buildForm(container, existing) {
         navigate(`listing/${existing.id}`);
       } else {
         const id = await createListing(state.firebaseUser.uid, data);
-        toast('Listing published!', 'success');
+        celebrate('Listing published', 'It’s live in the marketplace');
         navigate(`listing/${id}`);
       }
     } catch (err) {

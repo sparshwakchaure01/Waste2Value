@@ -5,7 +5,7 @@ import { state, setState } from '../state.js';
 // Fields a user may edit on their own profile. `role` is deliberately absent — it is permanent.
 const EDITABLE = [
   'name', 'companyName', 'phone', 'district', 'address', 'about', 'gstin', 'website',
-  'vehicleType', 'vehicleNumber', 'capacityTonnes', 'districts', 'servesAll'
+  'vehicleType', 'vehicleNumber', 'capacityTonnes', 'districts', 'servesAll', 'tourDone', 'notifSeenAt'
 ];
 
 export async function saveProfile(uid, patch) {
