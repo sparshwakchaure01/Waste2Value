@@ -90,3 +90,16 @@ Firestore's free **Spark** plan has no server-side compute (Cloud Functions requ
 
 - Logistics cost/price estimation was intentionally **not built** — out of scope by design for this prototype, even though it's mentioned in the official Challenge 3 wording. The logistics module focuses on service-area matching and deal pickup instead.
 - The prototype is scoped to the **plastics industry** (9 resin categories) to keep the first working build sharp; the architecture (categories, grades, listings, matching, reveal flow) generalizes to other material types without structural changes.
+
+
+## Additions since the first prototype
+
+- **Sign in / Create account / Admin login** — all Google. `/admin` has its own login restricted to `ADMIN_EMAILS`.
+- **Transport partners** — once a deal is *accepted*, buyer or seller sees logistics partners who serve the deal's district and can request one. New collection `transports/{requestId_logisticsId}` (status: pending → accepted/declined → completed). The partner's details and the requester's details stay behind the same blind-reveal rule until the partner accepts. Logistics accepts/declines and marks pickup on the Service Area & Deals page; completing a pickup also sets the deal to `completed`.
+- **My Listings** — edit, change status (Available / Reserved / Unavailable), delete, up to 4 photos per listing (`photos[]`, first mirrored in `photoBase64`).
+- **Marketplace** — sort, grid/list toggle, removable filter chips, saved listings (`savedListings[]` on the user doc), New badge, estimated totals.
+- **Matches** — status timeline and filter, offered quantity (`offeredQty` on a request), copy / call / mailto on revealed contacts, nav badge for requests awaiting a reply.
+- **Dashboard** — material totals, category chart, activity feed, quick actions. **Admin** — user search/filter, CSV export, charts.
+- **Mobile** — hamburger menu, collapsible filters, bottom-sheet modals, touch-sized controls (`styles/responsive.css`).
+
+After changing features that touch Firestore, republish `firestore.rules` (Firebase console → Firestore → Rules).

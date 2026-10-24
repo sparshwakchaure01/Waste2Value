@@ -5,7 +5,12 @@ export default defineConfig({
   publicDir: 'public',
   build: {
     outDir: 'dist',
-    emptyOutDir: true
+    emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks: { firebase: ['firebase/app', 'firebase/auth', 'firebase/firestore'] }
+      }
+    }
   },
   server: {
     port: 5173,

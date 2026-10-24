@@ -14,7 +14,7 @@ export function renderLanding(container) {
     el('nav', { class: 'topnav' }, [
       el('div', { class: 'topnav-inner' }, [
         el('div', { class: 'brand' }, brandLockup()),
-        el('div', { class: 'flex gap-8' }, [
+        el('div', { class: 'flex gap-8 landing-nav-actions' }, [
           el('button', { class: 'btn btn-ghost-light btn-sm', onclick: () => signInWithGoogle('signin') }, 'Sign in'),
           el('button', { class: 'btn btn-google btn-sm', onclick: () => signInWithGoogle('signup') }, 'Create account')
         ])
