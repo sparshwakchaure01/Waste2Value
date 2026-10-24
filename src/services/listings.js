@@ -68,3 +68,20 @@ export function filterListingsClientSide(listings, { category, grade, district, 
     return true;
   });
 }
+
+export const SORT_OPTIONS = [
+  ['newest', 'Newest first'],
+  ['price-asc', 'Price: low to high'],
+  ['price-desc', 'Price: high to low'],
+  ['qty-desc', 'Quantity: high to low']
+];
+
+const inKg = l => Number(l.quantity) * (l.unit === 'tonnes' ? 1000 : 1);
+
+export function sortListings(listings, key = 'newest') {
+  const out = [...listings];
+  if (key === 'price-asc') return out.sort((a, b) => Number(a.costPerKg) - Number(b.costPerKg));
+  if (key === 'price-desc') return out.sort((a, b) => Number(b.costPerKg) - Number(a.costPerKg));
+  if (key === 'qty-desc') return out.sort((a, b) => inKg(b) - inKg(a));
+  return out.sort(newestFirst);
+}
